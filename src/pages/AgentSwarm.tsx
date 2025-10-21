@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import SwarmForm from '@/components/SwarmForm';
 import SwarmDisplay from '@/components/SwarmDisplay';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-// Tipagem para as contribuições dos agentes em cada rodada
 export interface AgentContribution {
   agent: string;
   text: string;
 }
 
-// Tipagem para cada rodada da colaboração
 export interface SwarmRound {
   round: number;
   contributions: AgentContribution[];
@@ -19,6 +17,15 @@ const AgentSwarm = () => {
   const [rounds, setRounds] = useState<SwarmRound[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   const handleStartSwarm = ({ prompt, agents, mode }: { prompt: string; agents: string[]; mode: string }) => {
     if (!prompt || agents.length === 0) {
@@ -26,56 +33,49 @@ const AgentSwarm = () => {
       return;
     }
 
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
     setIsLoading(true);
     setRounds([]);
     setError(null);
 
-    // AQUI É ONDE A CONEXÃO SSE SERIA ESTABELECIDA
-    // Como não temos um backend, não podemos criar o EventSource de verdade.
-    // O código abaixo é um exemplo de como seria.
-    // const eventSource = new EventSource(`/api/swarm?prompt=${prompt}&agents=${agents.join(',')}&mode=${mode}`);
+    const queryParams = new URLSearchParams({
+      prompt,
+      agents: agents.join(','),
+      mode,
+    });
     
-    // eventSource.onmessage = (event) => {
-    //   const newRoundData = JSON.parse(event.data);
-    //   setRounds(prevRounds => {
-    //     // Lógica para atualizar os rounds com os dados recebidos
-    //     // Isso pode ser complexo dependendo de como os dados são transmitidos (palavra por palavra, etc.)
-    //     return [...prevRounds, newRoundData];
-    //   });
-    // };
-
-    // eventSource.onerror = (err) => {
-    //   console.error("EventSource failed:", err);
-    //   setError("Ocorreu um erro ao conectar com o servidor.");
-    //   setIsLoading(false);
-    //   eventSource.close();
-    // };
+    const url = `https://xkhsbxlwbgipzutufjei.supabase.co/functions/v1/agent-swarm?${queryParams.toString()}`;
     
-    // eventSource.onopen = () => {
-    //   console.log("Connection to server opened.");
-    // };
+    const eventSource = new EventSource(url);
+    eventSourceRef.current = eventSource;
 
-    // Simulação de dados para fins de UI
-    console.log("Iniciando simulação de swarm com:", { prompt, agents, mode });
-    setTimeout(() => {
-      setRounds([
-        {
-          round: 1,
-          contributions: [
-            { agent: 'Steve Jobs', text: 'O foco deve ser na experiência do usuário. Simplicidade é a máxima sofisticação.' },
-            { agent: 'Elon Musk', text: 'Concordo, mas precisamos pensar em uma solução 10x melhor que a concorrência, partindo dos princípios fundamentais.' }
-          ]
-        },
-        {
-          round: 2,
-          contributions: [
-            { agent: 'Jeff Bezos', text: 'A obsessão pelo cliente é crucial. O que o cliente ganha com isso? Devemos começar por aí e trabalhar de trás para frente.' },
-            { agent: 'Steve Jobs', text: 'Exato. O design não é apenas como parece, é como funciona. A solução precisa ser intuitiva.' }
-          ]
-        }
-      ]);
+    eventSource.onopen = () => {
+      console.log("Conexão SSE estabelecida com o servidor.");
+    };
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'done') {
+        setIsLoading(false);
+        eventSource.close();
+        eventSourceRef.current = null;
+        return;
+      }
+
+      setRounds(prevRounds => [...prevRounds, data]);
+    };
+
+    eventSource.onerror = (err) => {
+      console.error("Falha no EventSource:", err);
+      setError("Ocorreu um erro ao conectar com o servidor de colaboração.");
       setIsLoading(false);
-    }, 2000);
+      eventSource.close();
+      eventSourceRef.current = null;
+    };
   };
 
   return (
