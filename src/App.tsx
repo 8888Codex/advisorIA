@@ -9,7 +9,6 @@ import AgentSwarm from "./pages/AgentSwarm";
 import { Layout } from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import IndividualChat from "./pages/IndividualChat";
-import AdvisoryBoards from "./pages/AdvisoryBoards";
 import CustomClones from "./pages/CustomClones";
 import Login from "./pages/Login";
 import { SessionProvider } from "./contexts/SessionContext";
@@ -30,7 +29,6 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/agent-swarm" element={<AgentSwarm />} />
               <Route path="/chat" element={<IndividualChat />} />
-              <Route path="/boards" element={<AdvisoryBoards />} />
               <Route path="/clones" element={<CustomClones />} />
             </Route>
             <Route path="*" element={<NotFound />} />

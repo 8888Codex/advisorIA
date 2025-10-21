@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { BrainCircuit, MessageSquare, Users, Bot, LayoutDashboard } from "lucide-react";
+import { BrainCircuit, MessageSquare, Bot, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -8,7 +8,6 @@ const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/agent-swarm", icon: BrainCircuit, label: "Enxame de Agentes" },
   { to: "/chat", icon: MessageSquare, label: "Chat Individual" },
-  { to: "/boards", icon: Users, label: "Conselhos Consultivos" },
   { to: "/clones", icon: Bot, label: "Criar Clones" },
 ];
 

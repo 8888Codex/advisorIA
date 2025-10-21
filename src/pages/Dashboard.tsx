@@ -6,7 +6,7 @@ const Dashboard = () => {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Enxame de Agentes</CardTitle>
@@ -26,17 +26,6 @@ const Dashboard = () => {
           <CardContent>
             <Button asChild>
               <Link to="/chat">Começar a Conversar</Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Conselhos Consultivos</CardTitle>
-            <CardDescription>Crie e gerencie seus painéis de consultores de IA.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link to="/boards">Ver Conselhos</Link>
             </Button>
           </CardContent>
         </Card>
