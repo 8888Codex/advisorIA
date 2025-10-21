@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import IndividualChat from "./pages/IndividualChat";
 import AdvisoryBoards from "./pages/AdvisoryBoards";
 import CustomClones from "./pages/CustomClones";
+import Login from "./pages/Login";
+import { SessionProvider } from "./contexts/SessionContext";
 
 const queryClient = new QueryClient();
 
@@ -20,17 +22,20 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route element={<Layout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/agent-swarm" element={<AgentSwarm />} />
-            <Route path="/chat" element={<IndividualChat />} />
-            <Route path="/boards" element={<AdvisoryBoards />} />
-            <Route path="/clones" element={<CustomClones />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <SessionProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route element={<Layout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/agent-swarm" element={<AgentSwarm />} />
+              <Route path="/chat" element={<IndividualChat />} />
+              <Route path="/boards" element={<AdvisoryBoards />} />
+              <Route path="/clones" element={<CustomClones />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </SessionProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

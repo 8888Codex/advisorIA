@@ -1,9 +1,24 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Toaster } from "@/components/ui/sonner";
+import { useSession } from "@/contexts/SessionContext";
+import { useEffect } from "react";
 
 export function Layout() {
+  const { session } = useSession();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!session) {
+      navigate("/login", { replace: true });
+    }
+  }, [session, navigate]);
+
+  if (!session) {
+    return null; // Evita renderizar o layout antes do redirecionamento
+  }
+
   return (
     <div className="h-screen flex flex-col">
       <ResizablePanelGroup direction="horizontal" className="flex-1">
