@@ -13,7 +13,7 @@ const Index = () => {
           Acesse clones digitais de especialistas renomados para resolver seus maiores desafios de negócios.
         </p>
         <Button asChild size="lg">
-          <Link to="/agent-swarm">Iniciar Colaboração com Enxame de Agentes</Link>
+          <Link to="/dashboard">Entrar na Plataforma</Link>
         </Button>
       </div>
       <div className="absolute bottom-4">

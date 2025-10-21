@@ -6,6 +6,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AgentSwarm from "./pages/AgentSwarm";
+import { Layout } from "./components/Layout";
+import Dashboard from "./pages/Dashboard";
+import IndividualChat from "./pages/IndividualChat";
+import AdvisoryBoards from "./pages/AdvisoryBoards";
+import CustomClones from "./pages/CustomClones";
 
 const queryClient = new QueryClient();
 
@@ -17,8 +22,13 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/agent-swarm" element={<AgentSwarm />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/agent-swarm" element={<AgentSwarm />} />
+            <Route path="/chat" element={<IndividualChat />} />
+            <Route path="/boards" element={<AdvisoryBoards />} />
+            <Route path="/clones" element={<CustomClones />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
