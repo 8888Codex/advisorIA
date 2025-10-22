@@ -112,7 +112,7 @@ export function Header() {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled>Configurações</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/settings')}>Configurações</DropdownMenuItem>
             <DropdownMenuItem disabled>Suporte</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>Sair</DropdownMenuItem>

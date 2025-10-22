@@ -12,6 +12,7 @@ import IndividualChat from "./pages/IndividualChat";
 import CustomClones from "./pages/CustomClones";
 import Login from "./pages/Login";
 import { SessionProvider } from "./contexts/SessionContext";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/chat" element={<IndividualChat />} />
               <Route path="/chat/:conversationId" element={<IndividualChat />} />
               <Route path="/clones" element={<CustomClones />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
