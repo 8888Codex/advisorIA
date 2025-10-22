@@ -173,7 +173,7 @@ const CustomClones = () => {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription><FormMessage /></FormMessage></FormItem>
+                  <FormItem><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="title" render={({ field }) => (
                   <FormItem><FormLabel>Cargo / Título</FormLabel><FormControl><Input placeholder="Ex: Co-fundador da Apple" {...field} /></FormControl><FormMessage /></FormItem>
@@ -198,7 +198,7 @@ const CustomClones = () => {
                   {editingClone && <Button type="button" variant="outline" className="w-full" onClick={cancelEdit}>Cancelar</Button>}
                   <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isSubmitting ? (editingClone ? 'Atualizando...' : 'Criando...') : (editingClone ? 'Criar Clone' : 'Criar Clone')}
+                    {isSubmitting ? (editingClone ? 'Atualizando...' : 'Criando...') : (editingClone ? 'Atualizar Clone' : 'Criar Clone')}
                   </Button>
                 </div>
               </form>
