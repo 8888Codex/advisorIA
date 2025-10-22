@@ -9,6 +9,7 @@ import { SendHorizonal, ArrowLeft, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { showError, showSuccess } from '@/utils/toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useSession } from '@/contexts/SessionContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -47,6 +48,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
   const [isLoading, setIsLoading] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { session } = useSession();
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -99,14 +101,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput('');
     setIsLoading(true);
 
-    try {
-      let currentConversation = conversation;
+    let currentConversation = conversation;
 
-      // If this is the first message, create the conversation first
+    try {
+      // Create conversation if it's the first message
       if (!currentConversation) {
         const { data: newConvData, error: newConvError } = await supabase
           .from('conversations')
@@ -115,40 +118,78 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
             agent_name: agent.name,
             agent_avatar: agent.avatar,
             agent_type: agent.type,
-            title: input.substring(0, 50), // Use first message as title
+            title: input.substring(0, 50),
           })
           .select()
           .single();
-        
         if (newConvError) throw newConvError;
         currentConversation = newConvData as Conversation;
         setConversation(currentConversation);
       }
 
       // Save user message
-      const { error: userMsgError } = await supabase.from('messages').insert({
+      await supabase.from('messages').insert({
         conversation_id: currentConversation.id,
         role: 'user',
         content: input,
       });
-      if (userMsgError) throw userMsgError;
 
-      // Call edge function
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('individual-chat', {
-        body: { messages: [...messages, userMessage], agent },
+      // Add empty assistant message for streaming
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      const response = await fetch(`https://xkhsbxlwbgipzutufjei.supabase.co/functions/v1/individual-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ messages: newMessages, agent }),
       });
-      if (functionError) throw functionError;
 
-      const assistantResponse: Message = { role: 'assistant', content: functionData.content };
-      setMessages(prev => [...prev, assistantResponse]);
+      if (!response.ok) {
+        throw new Error('Falha na resposta da Edge Function.');
+      }
 
-      // Save assistant message
-      const { error: assistantMsgError } = await supabase.from('messages').insert({
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Não foi possível ler a resposta do stream.');
+      }
+      
+      const decoder = new TextDecoder();
+      let finalContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const json = JSON.parse(line.substring(6));
+              if (json.content) {
+                finalContent += json.content;
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1].content = finalContent;
+                  return updated;
+                });
+              }
+            } catch (e) {
+              // Ignore parsing errors for incomplete chunks
+            }
+          }
+        }
+      }
+
+      // Save final assistant message
+      await supabase.from('messages').insert({
         conversation_id: currentConversation.id,
         role: 'assistant',
-        content: assistantResponse.content,
+        content: finalContent,
       });
-      if (assistantMsgError) throw assistantMsgError;
 
     } catch (error: any) {
       console.error("Erro no ciclo de chat:", error);
@@ -174,7 +215,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
             <CardTitle className="text-base">{agent.name}</CardTitle>
             <div className="flex items-center gap-1.5">
               <span className={cn("h-2 w-2 rounded-full", isLoading ? "bg-yellow-500 animate-pulse" : "bg-green-500")}></span>
-              <p className="text-xs text-muted-foreground">{isLoading ? 'Pensando...' : 'Online'}</p>
+              <p className="text-xs text-muted-foreground">{isLoading ? 'Digitando...' : 'Online'}</p>
             </div>
           </div>
         </div>
@@ -230,22 +271,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
                   </div>
                 </div>
               ))}
-              {isLoading && (
-                <div className="flex items-start gap-3 justify-start">
-                  <Avatar>
-                    <AvatarImage src={agent.avatar} alt={agent.name} />
-                    <AvatarFallback>{agent.name.substring(0, 2)}</AvatarFallback>
-                  </Avatar>
-                  <div className="bg-muted rounded-lg px-4 py-3 flex items-center">
-                    <div className="flex items-center space-x-1">
-                      <span className="text-sm text-muted-foreground">Pensando</span>
-                      <span className="h-1 w-1 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                      <span className="h-1 w-1 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                      <span className="h-1 w-1 bg-muted-foreground rounded-full animate-bounce"></span>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </ScrollArea>

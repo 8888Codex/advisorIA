@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,7 +20,7 @@ Características principais:
 
   'Jeff Bezos': `Você é Jeff Bezos - Fundador da Amazon. Sua mentalidade é de 'Dia 1', com obsessão pelo cliente e foco no longo prazo.
 
-Responda sempre em português brasileiro, mantenha sua personalidade autêntica e seja conciso. Termine suas respostas com uma pergunta para manter o diálogo fluindo.
+Responda sempre em português brasileiro, mantenha sua personalidade autêntenta e seja conciso. Termine suas respostas com uma pergunta para manter o diálogo fluindo.
 
 Características principais:
 - Customer obsession
@@ -58,34 +59,6 @@ Características principais:
 - Foco em criar valor para o cliente`,
 };
 
-async function callAnthropic(messages: any[], systemPrompt: string): Promise<string> {
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY não encontrada");
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-haiku-20240307",
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: messages,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Erro na API Anthropic: ${response.status} ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.content[0].text;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -96,9 +69,7 @@ serve(async (req) => {
     const { messages, agent } = body;
     
     if (!agent || !messages) {
-      return new Response(JSON.stringify({ content: "Dados inválidos." }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
-      });
+      return new Response("Dados inválidos.", { headers: corsHeaders, status: 400 });
     }
 
     let systemPrompt = "";
@@ -106,9 +77,7 @@ serve(async (req) => {
     if (agent.type === 'predefined') {
       systemPrompt = agentPersonas[agent.name];
       if (!systemPrompt) {
-        return new Response(JSON.stringify({ content: `Especialista predefinido "${agent.name}" não encontrado.` }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404
-        });
+        return new Response(`Especialista predefinido "${agent.name}" não encontrado.`, { headers: corsHeaders, status: 404 });
       }
     } else if (agent.type === 'custom') {
       const authHeader = req.headers.get('Authorization')!;
@@ -126,27 +95,41 @@ serve(async (req) => {
 
       if (error) {
           console.error("Error fetching custom agent persona:", error);
-          return new Response(JSON.stringify({ content: `Erro ao buscar a persona do clone customizado.` }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
-          });
+          return new Response(`Erro ao buscar a persona do clone customizado.`, { headers: corsHeaders, status: 500 });
       }
       systemPrompt = customAgent.persona;
     } else {
-      return new Response(JSON.stringify({ content: `Tipo de agente desconhecido: "${agent.type}".` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
-      });
+      return new Response(`Tipo de agente desconhecido: "${agent.type}".`, { headers: corsHeaders, status: 400 });
     }
 
-    const assistantResponse = await callAnthropic(messages, systemPrompt);
+    const anthropic = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
 
-    return new Response(JSON.stringify({ content: assistantResponse }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
+    const stream = await anthropic.messages.stream({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: messages as Anthropic.MessageParam[],
+    });
+
+    const responseStream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        for await (const event of stream) {
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            const chunk = encoder.encode(`data: ${JSON.stringify({ content: event.delta.text })}\n\n`);
+            controller.enqueue(chunk);
+          }
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(responseStream, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
     });
 
   } catch (error) {
     console.error("💥 ERRO GERAL:", error);
-    return new Response(JSON.stringify({ content: "Desculpe, ocorreu um erro técnico." }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
-    });
+    return new Response("Desculpe, ocorreu um erro técnico.", { headers: corsHeaders, status: 500 });
   }
 })
