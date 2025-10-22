@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles, Pencil } from 'lucide-react';
 import { showSuccess, showError, showLoading } from '@/utils/toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,6 +41,7 @@ const CustomClones = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPersona, setIsGeneratingPersona] = useState(false);
   const [editingClone, setEditingClone] = useState<CustomAgent | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const form = useForm<z.infer<typeof cloneSchema>>({
     resolver: zodResolver(cloneSchema),
@@ -76,7 +78,6 @@ const CustomClones = () => {
     setIsGeneratingPersona(true);
     const toastId = showLoading('Iniciando geração de persona...');
     try {
-      // Step 1: Generate the base persona
       toast.loading('Passo 1/2: Pesquisando e gerando a persona base...', { id: toastId });
       const { data: personaData, error: personaError } = await supabase.functions.invoke('generate-persona', {
         body: { name },
@@ -85,7 +86,6 @@ const CustomClones = () => {
       if (personaError) throw personaError;
       if (personaData.error) throw new Error(`Etapa 1 falhou: ${personaData.error}`);
 
-      // Step 2: Refine the persona
       toast.loading('Passo 2/2: Refinando a estrutura da persona...', { id: toastId });
       const { data: refinedData, error: refinedError } = await supabase.functions.invoke('refine-persona', {
         body: { personaText: personaData.persona, agentName: name },
@@ -110,21 +110,20 @@ const CustomClones = () => {
     }
   };
 
-  const handleEdit = (clone: CustomAgent) => {
+  const handleOpenDialog = (clone: CustomAgent | null) => {
     setEditingClone(clone);
-    form.reset({
-      name: clone.name,
-      title: clone.title || '',
-      description: clone.description || '',
-      emoji: clone.emoji || '',
-      persona: clone.persona,
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const cancelEdit = () => {
-    setEditingClone(null);
-    form.reset({ name: '', title: '', description: '', emoji: '', persona: '' });
+    if (clone) {
+      form.reset({
+        name: clone.name,
+        title: clone.title || '',
+        description: clone.description || '',
+        emoji: clone.emoji || '',
+        persona: clone.persona,
+      });
+    } else {
+      form.reset({ name: '', title: '', description: '', emoji: '', persona: '' });
+    }
+    setIsDialogOpen(true);
   };
 
   const onSubmit = async (values: z.infer<typeof cloneSchema>) => {
@@ -147,8 +146,7 @@ const CustomClones = () => {
         },
       });
 
-      setEditingClone(null);
-      form.reset();
+      setIsDialogOpen(false);
       fetchClones();
     } catch (error) {
       showError(editingClone ? 'Falha ao atualizar o clone.' : 'Falha ao criar o clone.');
@@ -169,21 +167,26 @@ const CustomClones = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-1">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {editingClone ? <Pencil className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
-              {editingClone ? `Editando "${editingClone.name}"` : 'Criar Novo Clone'}
-            </CardTitle>
-            <CardDescription>
-              {editingClone ? 'Ajuste os detalhes do seu clone abaixo.' : 'Defina a personalidade e o conhecimento do seu especialista de IA.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+    <div>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Meus Clones Customizados</h1>
+          <p className="text-muted-foreground mt-1">Crie, edite e gerencie seus próprios especialistas de IA.</p>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => handleOpenDialog(null)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Criar Novo Clone
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{editingClone ? `Editando "${editingClone.name}"` : 'Criar Novo Clone'}</DialogTitle>
+              <CardDescription>{editingClone ? 'Ajuste os detalhes do seu clone abaixo.' : 'Defina a personalidade e o conhecimento do seu especialista de IA.'}</CardDescription>
+            </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField control={form.control} name="name" render={({ field }) => (
                     <FormItem className="sm:col-span-2"><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormMessage /></FormItem>
@@ -210,65 +213,64 @@ const CustomClones = () => {
                         Gerar com IA
                       </Button>
                     </div>
-                    <FormControl><Textarea placeholder="Descreva o tom de voz, a área de conhecimento, o estilo de resposta e as regras que este clone deve seguir..." rows={15} {...field} /></FormControl>
+                    <FormControl><Textarea placeholder="Descreva o tom de voz, a área de conhecimento, o estilo de resposta e as regras que este clone deve seguir..." rows={10} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
-                <div className="flex gap-2">
-                  {editingClone && <Button type="button" variant="outline" className="w-full" onClick={cancelEdit}>Cancelar</Button>}
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                  <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isSubmitting ? (editingClone ? 'Atualizando...' : 'Criando...') : (editingClone ? 'Atualizar Clone' : 'Criar Clone')}
+                    {editingClone ? 'Salvar Alterações' : 'Criar Clone'}
                   </Button>
                 </div>
               </form>
             </Form>
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
       </div>
-      <div className="lg:col-span-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" /> Seus Clones Customizados</CardTitle>
-            <CardDescription>Gerencie os especialistas que você criou.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-            ) : clones.length > 0 ? (
-              <div className="space-y-4">
-                {clones.map(clone => (
-                  <div key={clone.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{clone.emoji || '🤖'}</span>
-                      <div>
-                        <p className="font-semibold">{clone.name}</p>
-                        <p className="text-sm text-muted-foreground">{clone.title || 'Sem título'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => handleEdit(clone)}><Pencil className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>Excluir "{clone.name}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O clone será removido permanentemente.</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteClone(clone.id)}>Excluir</AlertDialogAction></AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" /> Sua Lista de Clones</CardTitle>
+          <CardDescription>Gerencie os especialistas que você criou.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : clones.length > 0 ? (
+            <div className="space-y-4">
+              {clones.map(clone => (
+                <div key={clone.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <span className="text-3xl">{clone.emoji || '🤖'}</span>
+                    <div>
+                      <p className="font-semibold">{clone.name}</p>
+                      <p className="text-sm text-muted-foreground">{clone.title || 'Sem título'}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
-                <Inbox className="h-12 w-12 mb-4 text-gray-400" />
-                <h3 className="text-lg font-semibold text-foreground">Nenhum clone encontrado</h3>
-                <p>Use o formulário ao lado para criar seu primeiro especialista.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => handleOpenDialog(clone)}><Pencil className="h-4 w-4" /></Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader><AlertDialogTitle>Excluir "{clone.name}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O clone será removido permanentemente.</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteClone(clone.id)}>Excluir</AlertDialogAction></AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
+              <Inbox className="h-12 w-12 mb-4 text-gray-400" />
+              <h3 className="text-lg font-semibold text-foreground">Nenhum clone encontrado</h3>
+              <p>Clique em "Criar Novo Clone" para começar.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
