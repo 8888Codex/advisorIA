@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Bot, Trash2, Loader2, Inbox } from 'lucide-react';
+import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -33,6 +33,7 @@ const CustomClones = () => {
   const [clones, setClones] = useState<CustomAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingPersona, setIsGeneratingPersona] = useState(false);
 
   const form = useForm<z.infer<typeof cloneSchema>>({
     resolver: zodResolver(cloneSchema),
@@ -60,6 +61,28 @@ const CustomClones = () => {
     fetchClones();
   }, [session]);
 
+  const handleGeneratePersona = async () => {
+    const name = form.getValues('name');
+    if (!name) {
+      showError('Por favor, insira um nome para o clone primeiro.');
+      return;
+    }
+    setIsGeneratingPersona(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-persona', {
+        body: { name },
+      });
+      if (error) throw error;
+      form.setValue('persona', data.persona, { shouldValidate: true });
+      showSuccess('Persona gerada com sucesso!');
+    } catch (error) {
+      showError('Falha ao gerar a persona.');
+      console.error(error);
+    } finally {
+      setIsGeneratingPersona(false);
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof cloneSchema>) => {
     setIsSubmitting(true);
     try {
@@ -67,7 +90,7 @@ const CustomClones = () => {
       if (error) throw error;
       showSuccess('Clone criado com sucesso!');
       form.reset();
-      fetchClones(); // Refresh the list
+      fetchClones();
     } catch (error) {
       showError('Falha ao criar o clone.');
     } finally {
@@ -80,7 +103,7 @@ const CustomClones = () => {
       const { error } = await supabase.from('custom_agents').delete().eq('id', cloneId);
       if (error) throw error;
       showSuccess('Clone excluído com sucesso.');
-      fetchClones(); // Refresh the list
+      fetchClones();
     } catch (error) {
       showError('Falha ao excluir o clone.');
     }
@@ -98,16 +121,26 @@ const CustomClones = () => {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Especialista em Marketing" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="title" render={({ field }) => (
-                  <FormItem><FormLabel>Cargo / Título</FormLabel><FormControl><Input placeholder="Ex: Diretor de Crescimento" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Cargo / Título</FormLabel><FormControl><Input placeholder="Ex: Co-fundador da Apple" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem><FormLabel>Descrição Curta</FormLabel><FormControl><Textarea placeholder="Descreva o propósito principal deste clone em uma frase." {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="persona" render={({ field }) => (
-                  <FormItem><FormLabel>Persona / Instruções</FormLabel><FormControl><Textarea placeholder="Seja detalhado. Descreva o tom de voz, a área de conhecimento, o estilo de resposta e as regras que este clone deve seguir..." rows={10} {...field} /></FormControl><FormDescription>Esta é a instrução principal que guiará seu clone.</FormDescription><FormMessage /></FormItem>
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Persona / Instruções</FormLabel>
+                      <Button type="button" variant="outline" size="sm" onClick={handleGeneratePersona} disabled={!form.watch('name') || isGeneratingPersona}>
+                        {isGeneratingPersona ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                        Gerar com IA
+                      </Button>
+                    </div>
+                    <FormControl><Textarea placeholder="Descreva o tom de voz, a área de conhecimento, o estilo de resposta e as regras que este clone deve seguir..." rows={15} {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
