@@ -154,10 +154,10 @@ const IndividualChat = () => {
                       )}
                       <div
                         className={cn(
-                          'max-w-prose rounded-lg px-4 py-3',
+                          'max-w-prose px-4 py-3 relative',
                           message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
+                            ? 'bg-primary text-primary-foreground rounded-t-xl rounded-bl-xl chat-bubble-user'
+                            : 'bg-muted rounded-t-xl rounded-br-xl chat-bubble-assistant'
                         )}
                       >
                         <p className="text-sm whitespace-pre-wrap">{message.content}</p>

@@ -99,3 +99,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .chat-bubble-user::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 10px 0 0 10px;
+    border-color: hsl(var(--primary)) transparent transparent transparent;
+    right: -10px;
+    bottom: 0;
+  }
+
+  .chat-bubble-assistant::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 10px 10px 0 0;
+    border-color: hsl(var(--muted)) transparent transparent transparent;
+    left: -10px;
+    bottom: 0;
+  }
+}
