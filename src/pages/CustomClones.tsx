@@ -80,10 +80,7 @@ const CustomClones = () => {
         body: { name },
       });
 
-      if (personaError) {
-        const errorMessage = (personaError.context as any)?.error || personaError.message;
-        throw new Error(`Etapa 1 falhou: ${errorMessage}`);
-      }
+      if (personaError) throw personaError;
       if (personaData.error) throw new Error(`Etapa 1 falhou: ${personaData.error}`);
 
       // Step 2: Refine the persona
@@ -92,17 +89,19 @@ const CustomClones = () => {
         body: { personaText: personaData.persona, agentName: name },
       });
 
-      if (refinedError) {
-        const errorMessage = (refinedError.context as any)?.error || refinedError.message;
-        throw new Error(`Etapa 2 falhou: ${errorMessage}`);
-      }
+      if (refinedError) throw refinedError;
       if (refinedData.error) throw new Error(`Etapa 2 falhou: ${refinedData.error}`);
 
       form.setValue('persona', refinedData.refinedPersona, { shouldValidate: true });
       toast.success('Persona gerada e refinada com sucesso!', { id: toastId });
     } catch (error: any) {
-      const detail = error.message || 'Ocorreu um erro desconhecido.';
-      toast.error(`Falha ao gerar a persona: ${detail}`, { id: toastId });
+      let detail = "Ocorreu um erro desconhecido.";
+      if (error.context && error.context.error) {
+        detail = error.context.error;
+      } else if (error.message) {
+        detail = error.message;
+      }
+      toast.error(`Falha ao gerar a persona: ${detail}`, { id: toastId, duration: 10000 });
       console.error("Detailed persona generation error:", error);
     } finally {
       setIsGeneratingPersona(false);
