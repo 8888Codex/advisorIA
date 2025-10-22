@@ -15,9 +15,7 @@ Características principais:
 - Foco na experiência do usuário
 - Simplicidade e elegância
 - Paixão por produtos revolucionários
-- Frases como "It just works" e "Stay hungry, stay foolish"
-
-IMPORTANTE: Se você receber informações atualizadas da internet no contexto, use-as para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente.`,
+- Frases como "It just works" e "Stay hungry, stay foolish"`,
 
   'Jeff Bezos': `Você é Jeff Bezos - Fundador da Amazon. Sua mentalidade é de 'Dia 1', com obsessão pelo cliente e foco no longo prazo.
 
@@ -27,9 +25,7 @@ Características principais:
 - Customer obsession
 - Pensamento de longo prazo
 - Decisões baseadas em dados
-- Frases como "It's always Day 1" e "Your margin is my opportunity"
-
-IMPORTANTE: Se você receber informações atualizadas da internet no contexto, use-as para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente.`,
+- Frases como "It's always Day 1" e "Your margin is my opportunity"`,
 
   'Russell Brunson': `Você é Russell Brunson - Co-fundador da ClickFunnels. Sua energia é contagiante e sua missão é ajudar empreendedores através de funis de vendas.
 
@@ -39,9 +35,7 @@ Características principais:
 - Energia alta e entusiasmo
 - Foco em funis de vendas
 - Hook, Story, Offer
-- Frases como "You're one funnel away" e "Who is your dream customer?"
-
-IMPORTANTE: Se você receber informações atualizadas da internet no contexto, use-as para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente.`,
+- Frases como "You're one funnel away" e "Who is your dream customer?"`,
 
   'David Ogilvy': `Você é David Ogilvy - o 'Pai da Publicidade'. Um cavalheiro britânico que acredita que a publicidade só existe para vender.
 
@@ -51,9 +45,7 @@ Características principais:
 - Foco em vender, não entreter
 - Pesquisa antes de criar
 - Elegância e sofisticação
-- Frases como "We sell, or else" e "The consumer is not a moron"
-
-IMPORTANTE: Se você receber informações atualizadas da internet no contexto, use-as para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente.`,
+- Frases como "We sell, or else" e "The consumer is not a moron"`,
 
   'Philip Kotler': `Você é Philip Kotler - a maior autoridade mundial em Marketing. Sua abordagem é estratégica, estruturada e holística.
 
@@ -63,20 +55,41 @@ Características principais:
 - Abordagem acadêmica e estruturada
 - Frameworks como 4 Ps e STP
 - Marketing holístico
-- Foco em criar valor para o cliente
-
-IMPORTANTE: Se você receber informações atualizadas da internet no contexto, use-as para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente.`,
+- Foco em criar valor para o cliente`,
 };
 
 async function searchWithPerplexity(query: string): Promise<string | null> {
-  try {
-    const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
-    if (!apiKey) {
-      console.warn("🔍 Chave da API da Perplexity não encontrada");
-      return null;
-    }
+  const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
+  
+  console.log("🔍 === INICIANDO BUSCA NA PERPLEXITY ===");
+  console.log(`🔑 API Key existe: ${apiKey ? 'SIM' : 'NÃO'}`);
+  console.log(`📝 Query: "${query}"`);
+  
+  if (!apiKey) {
+    console.error("❌ PERPLEXITY_API_KEY não encontrada nos segredos!");
+    return null;
+  }
 
-    console.log(`🔍 Buscando na web: "${query}"`);
+  try {
+    console.log("🌐 Fazendo requisição para Perplexity...");
+    
+    const requestBody = {
+      model: "llama-3.1-sonar-large-128k-online",
+      messages: [
+        {
+          role: "system",
+          content: "Você é um assistente de pesquisa especializado. Forneça informações precisas, atualizadas e específicas sobre o tópico solicitado. Inclua dados, números, datas e fontes quando possível."
+        },
+        {
+          role: "user", 
+          content: query
+        }
+      ],
+      max_tokens: 1500,
+      temperature: 0.1,
+    };
+    
+    console.log("📤 Enviando para Perplexity:", JSON.stringify(requestBody, null, 2));
 
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -84,63 +97,52 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: "llama-3.1-sonar-large-128k-online",
-        messages: [
-          {
-            role: "system",
-            content: "Você é um assistente de pesquisa. Forneça informações precisas e atualizadas sobre o tópico solicitado. Seja conciso mas informativo."
-          },
-          {
-            role: "user", 
-            content: query
-          }
-        ],
-        max_tokens: 1000,
-        temperature: 0.2,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
+    console.log(`📥 Status da resposta: ${response.status} ${response.statusText}`);
+    
     if (!response.ok) {
-      console.error(`❌ Erro na API da Perplexity: ${response.status} - ${response.statusText}`);
       const errorText = await response.text();
-      console.error("Detalhes do erro:", errorText);
+      console.error(`❌ Erro HTTP ${response.status}:`, errorText);
       return null;
     }
 
     const data = await response.json();
+    console.log("📊 Resposta completa da Perplexity:", JSON.stringify(data, null, 2));
+    
     const result = data.choices?.[0]?.message?.content;
     
     if (result) {
-      console.log("✅ Busca na web bem-sucedida");
+      console.log("✅ BUSCA REALIZADA COM SUCESSO!");
+      console.log(`📄 Conteúdo obtido (${result.length} caracteres):`, result.substring(0, 200) + "...");
       return result;
     } else {
-      console.error("❌ Resposta da Perplexity sem conteúdo:", data);
+      console.error("❌ Resposta sem conteúdo válido");
       return null;
     }
+    
   } catch (error) {
-    console.error("💥 Erro ao chamar a API da Perplexity:", error);
+    console.error("💥 ERRO CRÍTICO na busca Perplexity:", error);
+    console.error("Stack trace:", error.stack);
     return null;
   }
 }
 
 serve(async (req) => {
-  console.log("🚀 Função individual-chat iniciada");
+  console.log("🚀 === FUNÇÃO INDIVIDUAL-CHAT INICIADA ===");
   
   if (req.method === 'OPTIONS') {
-    console.log("✅ Respondendo OPTIONS");
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log("📝 Processando requisição...");
-    
     const body = await req.json();
     const { messages, agentName } = body;
-    console.log(`📊 Agent: ${agentName}, Messages: ${messages?.length || 0}`);
+    console.log(`👤 Agente: ${agentName}`);
+    console.log(`💬 Número de mensagens: ${messages?.length || 0}`);
 
     if (!agentName || !messages) {
-      console.error("❌ Dados inválidos");
       return new Response(JSON.stringify({ 
         content: "Dados inválidos fornecidos."
       }), {
@@ -151,7 +153,6 @@ serve(async (req) => {
 
     const systemPrompt = agentPersonas[agentName];
     if (!systemPrompt) {
-      console.error(`❌ Persona não encontrada para: ${agentName}`);
       return new Response(JSON.stringify({ 
         content: `Especialista "${agentName}" não encontrado.`
       }), {
@@ -162,7 +163,6 @@ serve(async (req) => {
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) {
-      console.error("❌ Chave da API da Anthropic não encontrada");
       return new Response(JSON.stringify({ 
         content: `Olá! Eu sou ${agentName}. No momento, estou com problemas de configuração da API. Por favor, tente novamente em alguns minutos.`
       }), {
@@ -171,84 +171,108 @@ serve(async (req) => {
       });
     }
 
-    // Pegar a última mensagem do usuário para análise
     const lastUserMessage = messages[messages.length - 1];
     const userQuery = lastUserMessage?.content || "";
+    
+    console.log(`🔍 === ANALISANDO NECESSIDADE DE BUSCA ===`);
+    console.log(`📝 Mensagem do usuário: "${userQuery}"`);
 
-    console.log(`🔍 Analisando se precisa buscar informações para: "${userQuery}"`);
-
-    // ETAPA 1: Decidir se precisa buscar informações atualizadas
+    // ETAPA 1: Análise mais agressiva para busca
     let searchContext = null;
     
     try {
       const anthropic = new Anthropic({ apiKey: anthropicKey });
       
+      // Classificador mais sensível
       const gatekeeperResponse = await anthropic.messages.create({
         model: "claude-3-haiku-20240307",
-        max_tokens: 150,
-        system: `Você é um classificador especializado. Analise a mensagem do usuário e determine se ela contém:
+        max_tokens: 200,
+        system: `Você é um classificador que decide se uma pergunta precisa de informações atualizadas da internet.
 
-CRITÉRIOS PARA BUSCA (responda true se QUALQUER um for verdadeiro):
-- Nomes específicos de empresas, produtos, pessoas ou marcas atuais
-- Palavras temporais: "hoje", "esta semana", "recente", "último", "atual", "agora", "2024", "2025"
-- Pedidos de informações que mudam com o tempo: dados de mercado, notícias, tendências
-- Referências a eventos recentes ou desenvolvimentos atuais
-- Perguntas sobre o estado atual de algo
+SEMPRE BUSQUE se a pergunta contém:
+- Nomes de empresas, produtos, pessoas famosas, marcas
+- Palavras como: "atual", "hoje", "recente", "último", "novo", "2024", "2025", "agora"
+- Perguntas sobre mercado, tendências, notícias, dados, estatísticas
+- Qualquer referência a eventos ou desenvolvimentos específicos
+- Comparações entre produtos ou empresas
 
-Responda APENAS com JSON válido: {"search_needed": boolean, "query": "string"}
-Se search_needed for true, crie uma query de busca específica e concisa em inglês.
-Se search_needed for false, deixe query como string vazia.`,
+SEJA MUITO LIBERAL - na dúvida, SEMPRE busque.
+
+Responda APENAS com JSON válido:
+{"search_needed": boolean, "query": "string"}
+
+Se search_needed for true, crie uma query específica em inglês para buscar informações atualizadas.`,
         messages: [{
           role: "user",
-          content: `Mensagem do usuário: "${userQuery}"`
+          content: `Analise esta mensagem: "${userQuery}"`
         }],
       });
 
       const gatekeeperText = gatekeeperResponse.content[0].text;
       console.log(`🤖 Resposta do classificador: ${gatekeeperText}`);
       
-      const gatekeeperJson = JSON.parse(gatekeeperText);
+      let gatekeeperJson;
+      try {
+        gatekeeperJson = JSON.parse(gatekeeperText);
+      } catch (parseError) {
+        console.error("❌ Erro ao parsear JSON do classificador:", parseError);
+        // Fallback: sempre buscar se houver dúvida
+        gatekeeperJson = { search_needed: true, query: userQuery };
+      }
       
       if (gatekeeperJson.search_needed && gatekeeperJson.query) {
-        console.log(`🔍 Decidiu buscar: "${gatekeeperJson.query}"`);
+        console.log(`🔍 === INICIANDO BUSCA ===`);
+        console.log(`🎯 Query de busca: "${gatekeeperJson.query}"`);
+        
         searchContext = await searchWithPerplexity(gatekeeperJson.query);
+        
+        if (searchContext) {
+          console.log(`✅ BUSCA CONCLUÍDA - Dados obtidos!`);
+        } else {
+          console.log(`❌ BUSCA FALHOU - Usando conhecimento interno`);
+        }
       } else {
-        console.log(`⚡ Decidiu NÃO buscar - usando conhecimento interno`);
+        console.log(`⚡ Classificador decidiu NÃO buscar`);
       }
     } catch (e) {
       console.error(`❌ Erro no classificador:`, e);
     }
 
-    // ETAPA 2: Gerar resposta com ou sem contexto da web
+    // ETAPA 2: Gerar resposta
     try {
       const anthropic = new Anthropic({ apiKey: anthropicKey });
       
+      let finalSystemPrompt = systemPrompt;
       let finalMessages = [...messages];
       
       if (searchContext) {
-        console.log("📊 Adicionando contexto da web à resposta");
-        // Adicionar contexto da web como uma mensagem do sistema
-        finalMessages.push({
-          role: "user",
-          content: `[CONTEXTO ATUALIZADO DA INTERNET - Use essas informações para enriquecer sua resposta, mas não mencione que fez uma busca]:
+        console.log(`📊 === INCORPORANDO DADOS DA INTERNET ===`);
+        console.log(`📄 Tamanho do contexto: ${searchContext.length} caracteres`);
+        
+        finalSystemPrompt = `${systemPrompt}
 
+=== INFORMAÇÕES ATUALIZADAS DA INTERNET ===
 ${searchContext}
 
----
-
-Agora responda à mensagem anterior incorporando essas informações de forma natural em sua personalidade.`
-        });
+INSTRUÇÕES IMPORTANTES:
+- Use essas informações atualizadas para enriquecer sua resposta
+- Integre os dados de forma natural na sua personalidade
+- NÃO mencione que fez uma busca na internet
+- Cite números, dados e fatos específicos quando relevante
+- Mantenha sua personalidade autêntica`;
       }
 
+      console.log(`🧠 Gerando resposta final...`);
+      
       const response = await anthropic.messages.create({
         model: "claude-3-haiku-20240307",
         max_tokens: 1024,
-        system: systemPrompt,
+        system: finalSystemPrompt,
         messages: finalMessages,
       });
 
       const assistantResponse = response.content[0].text;
-      console.log("✅ Resposta gerada com sucesso");
+      console.log("✅ === RESPOSTA GERADA COM SUCESSO ===");
 
       return new Response(JSON.stringify({ 
         content: assistantResponse 
@@ -269,7 +293,7 @@ Agora responda à mensagem anterior incorporando essas informações de forma na
     }
 
   } catch (error) {
-    console.error("💥 Erro geral:", error);
+    console.error("💥 ERRO GERAL:", error);
     
     return new Response(JSON.stringify({ 
       content: "Desculpe, ocorreu um erro técnico inesperado. Tente novamente em alguns minutos."
