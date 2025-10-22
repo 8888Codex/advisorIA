@@ -72,28 +72,34 @@ const CustomClones = () => {
     setIsGeneratingPersona(true);
     const toastId = showLoading('Iniciando geração de persona...');
     try {
-      // Step 1: Generate the base persona
+      const { data, error } = await supabase.functions.invoke('generate-persona', {
+        body: { name },
+      });
+
+      if (error) {
+        // Robust error extraction from Supabase FunctionError
+        let errorMessage = error.message;
+        if (error.context && typeof error.context === 'object' && error.context.error) {
+          errorMessage = error.context.error.message || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      if (data.error) throw new Error(data.error);
+
       toast.loading('Passo 1/2: Pesquisando e gerando a persona base...', { id: toastId });
       const { data: personaData, error: personaError } = await supabase.functions.invoke('generate-persona', {
         body: { name },
       });
 
-      if (personaError) {
-        const detailedError = personaError.context?.error?.message || personaError.message;
-        throw new Error(detailedError);
-      }
+      if (personaError) throw personaError;
       if (personaData.error) throw new Error(personaData.error);
 
-      // Step 2: Refine the persona
       toast.loading('Passo 2/2: Refinando a estrutura da persona...', { id: toastId });
       const { data: refinedData, error: refinedError } = await supabase.functions.invoke('refine-persona', {
         body: { personaText: personaData.persona, agentName: name },
       });
 
-      if (refinedError) {
-        const detailedError = refinedError.context?.error?.message || refinedError.message;
-        throw new Error(detailedError);
-      }
+      if (refinedError) throw refinedError;
       if (refinedData.error) throw new Error(refinedData.error);
 
       form.setValue('persona', refinedData.refinedPersona, { shouldValidate: true });
