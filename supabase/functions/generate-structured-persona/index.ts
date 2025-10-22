@@ -97,12 +97,26 @@ Sua resposta final deve ser APENAS o objeto JSON, sem nenhum texto ou formataç�
     });
 
     const rawContent = response.content[0].text;
-    const cleanedContent = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-    const personaData = JSON.parse(cleanedContent);
+    
+    try {
+      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("A resposta da IA não continha um objeto JSON válido.");
+      }
+      const cleanedContent = jsonMatch[0];
+      const personaData = JSON.parse(cleanedContent);
 
-    return new Response(JSON.stringify(personaData), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      return new Response(JSON.stringify(personaData), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (parseError) {
+      console.error("--- JSON Parsing Error ---", parseError);
+      console.error("Raw content from AI:", rawContent);
+      return new Response(JSON.stringify({ error: "A IA retornou uma resposta em um formato inesperado. Por favor, tente novamente." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
+    }
 
   } catch (error) {
     console.error("--- Error in generate-structured-persona function ---", error);
