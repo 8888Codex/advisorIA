@@ -5,6 +5,7 @@ import { useSession } from "@/contexts/SessionContext";
 import { useEffect, useState } from "react";
 import { BrainCircuit, MessageSquare, ArrowRight, Globe, Loader2 } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import PerplexityActivator from "@/components/PerplexityActivator";
 
 const Dashboard = () => {
   const { session, supabase } = useSession();
@@ -70,16 +71,20 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {/* BOTÃO DE TESTE DA API - MUITO VISÍVEL */}
+      {/* NOVO COMPONENTE DE ATIVAÇÃO */}
+      <div className="flex justify-center">
+        <PerplexityActivator />
+      </div>
+
+      {/* BOTÃO DE TESTE LEGADO - MANTIDO PARA COMPATIBILIDADE */}
       <Card className="border-2 border-orange-300 bg-orange-50 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-orange-800">
             <Globe className="h-6 w-6 text-orange-600" />
-            🧪 TESTE DE CONECTIVIDADE COM INTERNET
+            🧪 TESTE RÁPIDO DE CONECTIVIDADE
           </CardTitle>
           <CardDescription className="text-orange-700">
-            <strong>IMPORTANTE:</strong> Teste se os clones conseguem acessar informações atualizadas da internet.
-            Este teste vai verificar se a API da Perplexity está funcionando corretamente.
+            <strong>TESTE LEGADO:</strong> Use o novo "Ativador da API Perplexity" acima para testes mais detalhados.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,7 +102,7 @@ const Dashboard = () => {
             ) : (
               <>
                 <Globe className="mr-2 h-5 w-5" />
-                🚀 TESTAR CONEXÃO COM INTERNET AGORA
+                🚀 TESTE RÁPIDO DA INTERNET
               </>
             )}
           </Button>
