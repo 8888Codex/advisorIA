@@ -189,7 +189,12 @@ const CustomClones = () => {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem className="sm:col-span-2"><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Nome do Clone</FormLabel>
+                      <FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl>
+                      <FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
                   )} />
                   <FormField control={form.control} name="emoji" render={({ field }) => (
                     <FormItem><FormLabel>Emoji</FormLabel><FormControl><Input placeholder="💡" {...field} /></FormControl><FormMessage /></FormItem>
