@@ -195,9 +195,6 @@ const CustomClones = () => {
                     <FormItem><FormLabel>Emoji</FormLabel><FormControl><Input placeholder="💡" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
-                <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription></FormItem>
-                )} />
                 <FormField control={form.control} name="title" render={({ field }) => (
                   <FormItem><FormLabel>Cargo / Título</FormLabel><FormControl><Input placeholder="Ex: Co-fundador da Apple" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -213,6 +210,7 @@ const CustomClones = () => {
                         Gerar com IA
                       </Button>
                     </div>
+                    <FormDescription>Digite um nome acima e clique em "Gerar com IA" para criar uma persona automaticamente, ou escreva a sua própria.</FormDescription>
                     <FormControl><Textarea placeholder="Descreva o tom de voz, a área de conhecimento, o estilo de resposta e as regras que este clone deve seguir..." rows={10} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
