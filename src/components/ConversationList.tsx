@@ -10,7 +10,11 @@ import { ptBR } from 'date-fns/locale';
 
 interface Conversation {
   id: string;
-  title: string;
+  agent_id: string;
+  agent_name: string;
+  agent_avatar?: string;
+  agent_type: 'predefined' | 'custom';
+  title?: string;
   updated_at: string;
 }
 
@@ -38,7 +42,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({ agent, onSel
       try {
         const { data, error } = await supabase
           .from('conversations')
-          .select('id, title, updated_at')
+          .select('*')
           .eq('agent_id', agent.id)
           .order('updated_at', { ascending: false });
         if (error) throw error;

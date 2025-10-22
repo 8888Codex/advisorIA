@@ -24,7 +24,11 @@ type SelectedAgent = {
 
 interface Conversation {
   id: string;
-  title: string;
+  agent_id: string;
+  agent_name: string;
+  agent_avatar?: string;
+  agent_type: 'predefined' | 'custom';
+  title?: string;
   updated_at: string;
 }
 
@@ -47,7 +51,7 @@ const IndividualChat = () => {
         const { data: convData, error: convError } = await supabase.from('conversations').select('*').eq('id', conversationId).single();
         if (convError || !convData) throw new Error('Conversa não encontrada.');
         
-        setSelectedConversation(convData);
+        setSelectedConversation(convData as Conversation);
 
         let agentData: SelectedAgent | null = null;
         if (convData.agent_type === 'predefined') {
