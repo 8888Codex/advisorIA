@@ -59,11 +59,6 @@ Características principais:
 
 async function searchWithPerplexity(query: string): Promise<string | null> {
   const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
-  
-  console.log("🔍 === INICIANDO BUSCA REAL NA PERPLEXITY ===");
-  console.log(`🔑 API Key configurada: ${apiKey ? 'SIM' : 'NÃO'}`);
-  console.log(`📝 Query de busca: "${query}"`);
-  
   if (!apiKey) {
     console.error("❌ PERPLEXITY_API_KEY não encontrada nos segredos!");
     return null;
@@ -71,11 +66,11 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
 
   try {
     const requestBody = {
-      model: "llama-3.1-sonar-large-128k-online",
+      model: "llama-3-sonar-large-32k-online", // MODELO CORRIGIDO
       messages: [
         {
           role: "system",
-          content: "Você é um assistente de pesquisa especializado. Forneça informações precisas, atualizadas e detalhadas sobre o tópico solicitado. Inclua dados específicos, números, datas e contexto relevante."
+          content: "Você é um assistente de pesquisa especializado. Forneça informações precisas, atualizadas e detalhadas sobre o tópico solicitado."
         },
         {
           role: "user", 
@@ -86,8 +81,6 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
       temperature: 0.1,
     };
     
-    console.log("🌐 Enviando requisição para Perplexity API...");
-
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
@@ -97,8 +90,6 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
       body: JSON.stringify(requestBody),
     });
 
-    console.log(`📥 Status da resposta: ${response.status} ${response.statusText}`);
-    
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ Erro HTTP ${response.status}:`, errorText);
@@ -106,17 +97,7 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
     }
 
     const data = await response.json();
-    const result = data.choices?.[0]?.message?.content;
-    
-    if (result && result.trim()) {
-      console.log("✅ BUSCA NA INTERNET REALIZADA COM SUCESSO!");
-      console.log(`📊 Dados obtidos (${result.length} caracteres)`);
-      console.log(`📄 Preview: ${result.substring(0, 150)}...`);
-      return result;
-    } else {
-      console.error("❌ Resposta da Perplexity vazia ou inválida");
-      return null;
-    }
+    return data.choices?.[0]?.message?.content || null;
     
   } catch (error) {
     console.error("💥 ERRO CRÍTICO na busca Perplexity:", error);
@@ -126,12 +107,7 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
 
 async function callAnthropic(messages: any[], systemPrompt: string): Promise<string> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY não encontrada");
-  }
-
-  console.log("🧠 Chamando Anthropic API...");
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY não encontrada");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -150,8 +126,7 @@ async function callAnthropic(messages: any[], systemPrompt: string): Promise<str
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`❌ Erro Anthropic ${response.status}:`, errorText);
-    throw new Error(`Erro na API Anthropic: ${response.status}`);
+    throw new Error(`Erro na API Anthropic: ${response.status} ${errorText}`);
   }
 
   const data = await response.json();
@@ -159,8 +134,6 @@ async function callAnthropic(messages: any[], systemPrompt: string): Promise<str
 }
 
 serve(async (req) => {
-  console.log("🚀 === FUNÇÃO INDIVIDUAL-CHAT INICIADA ===");
-  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -169,139 +142,37 @@ serve(async (req) => {
     const body = await req.json();
     const { messages, agentName } = body;
     
-    console.log(`👤 Especialista: ${agentName}`);
-    console.log(`💬 Total de mensagens: ${messages?.length || 0}`);
-
     if (!agentName || !messages) {
-      return new Response(JSON.stringify({ 
-        content: "Dados inválidos fornecidos."
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+      return new Response(JSON.stringify({ content: "Dados inválidos." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
       });
     }
 
     const systemPrompt = agentPersonas[agentName];
     if (!systemPrompt) {
-      return new Response(JSON.stringify({ 
-        content: `Especialista "${agentName}" não encontrado.`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+      return new Response(JSON.stringify({ content: `Especialista "${agentName}" não encontrado.` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404
       });
     }
 
-    const lastUserMessage = messages[messages.length - 1];
-    const userQuery = lastUserMessage?.content || "";
+    const userQuery = messages[messages.length - 1]?.content || "";
+    const searchContext = await searchWithPerplexity(userQuery);
     
-    console.log(`🔍 === ANÁLISE DA MENSAGEM ===`);
-    console.log(`📝 Mensagem: "${userQuery}"`);
-
-    // ETAPA 1: Análise mais agressiva para busca
-    let searchContext = null;
-    let shouldSearch = false;
-    
-    // Lista expandida de termos que indicam necessidade de busca
-    const searchTriggers = [
-      // Temporais
-      'atual', 'hoje', 'agora', 'recente', 'último', 'nova', 'novo', 'últimos', 'recentes',
-      '2024', '2025', 'este ano', 'ano passado', 'mês passado', 'semana passada',
-      
-      // Empresas e produtos
-      'apple', 'iphone', 'ipad', 'mac', 'amazon', 'aws', 'google', 'meta', 'facebook',
-      'tesla', 'microsoft', 'netflix', 'uber', 'airbnb', 'tiktok', 'instagram',
-      'clickfunnels', 'shopify', 'wordpress', 'youtube',
-      
-      // Termos de mercado
-      'mercado', 'vendas', 'receita', 'lucro', 'ações', 'bolsa', 'economia',
-      'tendência', 'tendências', 'estatística', 'dados', 'pesquisa', 'estudo',
-      'relatório', 'análise', 'crescimento', 'queda', 'aumento', 'diminuição',
-      
-      // Termos de busca explícita
-      'como está', 'o que aconteceu', 'qual é', 'me fale sobre', 'explique sobre',
-      'informações sobre', 'dados sobre', 'notícias sobre'
-    ];
-    
-    const queryLower = userQuery.toLowerCase();
-    
-    for (const trigger of searchTriggers) {
-      if (queryLower.includes(trigger.toLowerCase())) {
-        shouldSearch = true;
-        console.log(`🎯 Trigger encontrado: "${trigger}"`);
-        break;
-      }
-    }
-    
-    // Se a mensagem tem mais de 10 palavras e menciona empresas/produtos, também busca
-    const wordCount = userQuery.split(' ').length;
-    if (wordCount > 10 && (queryLower.includes('empresa') || queryLower.includes('produto') || queryLower.includes('negócio'))) {
-      shouldSearch = true;
-      console.log(`🎯 Mensagem longa sobre negócios detectada`);
-    }
-
-    console.log(`🔍 Decisão de busca: ${shouldSearch ? 'SIM - VAI BUSCAR' : 'NÃO - Conhecimento interno'}`);
-
-    // ETAPA 2: Executar busca se necessário
-    if (shouldSearch) {
-      console.log("🌐 === EXECUTANDO BUSCA NA INTERNET ===");
-      searchContext = await searchWithPerplexity(userQuery);
-      
-      if (searchContext) {
-        console.log("✅ DADOS DA INTERNET OBTIDOS COM SUCESSO!");
-      } else {
-        console.log("❌ Busca falhou - usando conhecimento interno");
-      }
-    }
-
-    // ETAPA 3: Gerar resposta
     let finalSystemPrompt = systemPrompt;
-    
     if (searchContext) {
-      console.log("📊 === INCORPORANDO DADOS DA INTERNET NA RESPOSTA ===");
-      finalSystemPrompt = `${systemPrompt}
-
-=== INFORMAÇÕES ATUALIZADAS DA INTERNET ===
-${searchContext}
-
-INSTRUÇÕES CRÍTICAS:
-- Use essas informações atualizadas para enriquecer sua resposta
-- Cite dados específicos, números e fatos quando relevante
-- Integre as informações de forma natural na sua personalidade
-- NÃO mencione que fez uma busca na internet
-- Seja específico e preciso com os dados obtidos`;
+      finalSystemPrompt = `${systemPrompt}\n\n=== INFORMAÇÕES ATUALIZADAS DA INTERNET ===\n${searchContext}\n\nINSTRUÇÕES CRÍTICAS: Use essas informações para enriquecer sua resposta. NÃO mencione que fez uma busca.`;
     }
 
-    try {
-      console.log("🧠 Gerando resposta final...");
-      const assistantResponse = await callAnthropic(messages, finalSystemPrompt);
-      console.log("✅ === RESPOSTA GERADA COM SUCESSO ===");
+    const assistantResponse = await callAnthropic(messages, finalSystemPrompt);
 
-      return new Response(JSON.stringify({ 
-        content: assistantResponse 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-
-    } catch (anthropicError) {
-      console.error("💥 Erro na Anthropic:", anthropicError);
-      
-      return new Response(JSON.stringify({ 
-        content: `Olá! Eu sou ${agentName}. No momento, estou com dificuldades técnicas. Tente novamente em alguns minutos.`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
+    return new Response(JSON.stringify({ content: assistantResponse }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
+    });
 
   } catch (error) {
     console.error("💥 ERRO GERAL:", error);
-    
-    return new Response(JSON.stringify({ 
-      content: "Desculpe, ocorreu um erro técnico. Tente novamente em alguns minutos."
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+    return new Response(JSON.stringify({ content: "Desculpe, ocorreu um erro técnico." }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
     });
   }
 })
