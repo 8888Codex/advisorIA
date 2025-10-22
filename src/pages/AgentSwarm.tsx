@@ -29,7 +29,7 @@ const AgentSwarm = () => {
     };
   }, []);
 
-  const handleStartSwarm = ({ prompt, agents, mode }: { prompt: string; agents: string[]; mode: string }) => {
+  const handleStartSwarm = ({ prompt, agents, mode }: { prompt: string; agents: { id: string; name: string; type: 'predefined' | 'custom' }[]; mode: string }) => {
     if (!prompt || agents.length === 0) {
       setError("Por favor, insira um problema e selecione pelo menos um especialista.");
       return;
@@ -45,7 +45,7 @@ const AgentSwarm = () => {
 
     const queryParams = new URLSearchParams({
       prompt,
-      agents: agents.join(','),
+      agents: JSON.stringify(agents),
       mode,
     });
     

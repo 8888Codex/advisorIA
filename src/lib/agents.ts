@@ -7,6 +7,7 @@ export interface Agent {
   tags: string[];
   fidelity: 'Alta';
   customizable: boolean;
+  type: 'predefined';
 }
 
 export const availableAgents: Agent[] = [
@@ -19,6 +20,7 @@ export const availableAgents: Agent[] = [
     tags: ['Branding', 'Design de Produto', 'Inovação'],
     fidelity: 'Alta',
     customizable: false,
+    type: 'predefined',
   },
   {
     id: 'russell-brunson',
@@ -29,6 +31,7 @@ export const availableAgents: Agent[] = [
     tags: ['Funis de Venda', 'Marketing Direto', 'Copywriting'],
     fidelity: 'Alta',
     customizable: false,
+    type: 'predefined',
   },
   {
     id: 'jeff-bezos',
@@ -39,6 +42,7 @@ export const availableAgents: Agent[] = [
     tags: ['E-commerce', 'Customer-Centric', 'Escalabilidade'],
     fidelity: 'Alta',
     customizable: false,
+    type: 'predefined',
   },
   {
     id: 'david-ogilvy',
@@ -49,6 +53,7 @@ export const availableAgents: Agent[] = [
     tags: ['Publicidade', 'Copywriting', 'Branding'],
     fidelity: 'Alta',
     customizable: false,
+    type: 'predefined',
   },
   {
     id: 'philip-kotler',
@@ -59,5 +64,6 @@ export const availableAgents: Agent[] = [
     tags: ['Marketing Estratégico', 'Gestão', 'Posicionamento'],
     fidelity: 'Alta',
     customizable: false,
+    type: 'predefined',
   },
 ];

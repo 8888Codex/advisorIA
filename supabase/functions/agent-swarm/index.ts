@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -288,47 +289,6 @@ INSTRUÇÕES DE RESPOSTA:
 `,
 };
 
-async function searchWithPerplexity(query: string): Promise<string | null> {
-  try {
-    const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
-    if (!apiKey) {
-      console.warn("Chave da API da Perplexity não encontrada. Pulando a busca na web.");
-      return null;
-    }
-
-    console.log(`🔍 Buscando na internet: "${query}"`);
-
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3-sonar-small-32k-online",
-        messages: [{ role: "user", content: query }],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(`Erro na API da Perplexity: ${response.statusText}`);
-      return null;
-    }
-
-    const data = await response.json();
-    const result = data.choices[0]?.message?.content;
-    
-    if (result) {
-      console.log(`✅ Busca bem-sucedida! Resultado: ${result.substring(0, 100)}...`);
-    }
-    
-    return result || null;
-  } catch (error) {
-    console.error("Erro ao chamar a API da Perplexity:", error);
-    return null;
-  }
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -341,7 +301,7 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const userPrompt = url.searchParams.get('prompt');
-    const agentsParam = url.search_params.get('agents');
+    const agentsParam = url.searchParams.get('agents');
     const mode = url.searchParams.get('mode');
 
     if (!Deno.env.get("ANTHROPIC_API_KEY")) {
@@ -355,40 +315,51 @@ serve(async (req) => {
       });
     }
 
-    const selectedAgents = agentsParam.split(',');
+    const selectedAgents = JSON.parse(agentsParam);
     const numRounds = mode === 'deep' ? 5 : 3;
     let conversationHistory: Anthropic.MessageParam[] = [{ role: 'user', content: `Desafio do Usuário: "${userPrompt}"` }];
+
+    const authHeader = req.headers.get('Authorization')!;
+    const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const customAgentIds = selectedAgents.filter((a: any) => a.type === 'custom').map((a: any) => a.id);
+    const customPersonas: Record<string, string> = {};
+
+    if (customAgentIds.length > 0) {
+        const { data, error } = await supabaseClient
+            .from('custom_agents')
+            .select('id, persona')
+            .in('id', customAgentIds);
+
+        if (error) {
+            console.error("Error fetching custom agent personas for swarm:", error);
+            // Continue without custom personas if fetch fails
+        } else {
+            data.forEach((agent: any) => {
+                customPersonas[agent.id] = agent.persona;
+            });
+        }
+    }
 
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
 
         for (let i = 1; i <= numRounds; i++) {
-          const agentPromises = selectedAgents.map(async (agent) => {
-            const persona = agentPersonas[agent] || "Você é um assistente de IA prestativo.";
-            
-            // SEMPRE fazer busca na internet para cada agente
-            console.log(`🤖 ${agent} processando round ${i}: "${userPrompt}"`);
-            const searchContext = await searchWithPerplexity(userPrompt);
-
-            // Etapa 3: Síntese
-            const finalMessagesForAgent = [...conversationHistory];
-            let taskForAgent = `Sua tarefa: Forneça sua próxima contribuição para resolver o desafio. Seja conciso e construa sobre as ideias anteriores. Não repita seu nome ou cargo.`;
-            
-            if (searchContext) {
-              console.log(`🌐 ${agent} obteve dados da internet!`);
-              taskForAgent = `${taskForAgent}
-
----
-[CONTEXTO INTERNO: Dados recentes da internet relevantes para sua contribuição:
-${searchContext}
-
-INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente em seu raciocínio e mantenha sua persona.]
----`;
+          const agentPromises = selectedAgents.map(async (agent: any) => {
+            let persona = "";
+            if (agent.type === 'predefined') {
+              persona = agentPersonas[agent.name] || "Você é um assistente de IA prestativo.";
             } else {
-              console.log(`⚠️ ${agent} não conseguiu dados da internet, usando conhecimento base.`);
+              persona = customPersonas[agent.id] || "Você é um clone de IA customizado. Aja de acordo com sua persona definida.";
             }
             
+            const finalMessagesForAgent = [...conversationHistory];
+            let taskForAgent = `Sua tarefa: Forneça sua próxima contribuição para resolver o desafio. Seja conciso e construa sobre as ideias anteriores. Não repita seu nome ou cargo.`;
             finalMessagesForAgent.push({ role: 'user', content: taskForAgent });
 
             const response = await anthropic.messages.create({
@@ -399,7 +370,7 @@ INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não men
             });
             
             const text = response.content[0].text;
-            return { agent, text };
+            return { agent: agent.name, text };
           });
 
           const contributions = await Promise.all(agentPromises);

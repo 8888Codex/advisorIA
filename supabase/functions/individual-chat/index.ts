@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,76 +58,6 @@ Características principais:
 - Foco em criar valor para o cliente`,
 };
 
-async function searchWithPerplexity(query: string): Promise<string | null> {
-  const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
-  if (!apiKey) {
-    console.error("❌ PERPLEXITY_API_KEY não encontrada!");
-    return null;
-  }
-
-  try {
-    // Melhorar a query para obter dados mais atuais
-    let enhancedQuery = query;
-    
-    // Se a pergunta for sobre iPhone, tornar mais específica
-    if (query.toLowerCase().includes('iphone')) {
-      enhancedQuery = `What is the latest iPhone model released by Apple in 2024? Include iPhone 16 series details and current information.`;
-    }
-    // Se for sobre produtos Apple em geral
-    else if (query.toLowerCase().includes('apple')) {
-      enhancedQuery = `${query} - provide the most current information from 2024`;
-    }
-    // Para outras perguntas, adicionar contexto temporal
-    else {
-      enhancedQuery = `${query} - current information and latest updates from 2024`;
-    }
-    
-    console.log(`🔍 Busca melhorada: "${enhancedQuery}"`);
-    
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3-sonar-small-32k-online",
-        messages: [
-          {
-            role: "system",
-            content: "You are a research assistant specialized in providing the most current and accurate information. Always prioritize recent data from 2024 and the latest updates. Be specific about dates and current status."
-          },
-          {
-            role: "user", 
-            content: enhancedQuery
-          }
-        ],
-        max_tokens: 1500,
-        temperature: 0.1,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ Erro HTTP ${response.status}:`, errorText);
-      return null;
-    }
-
-    const data = await response.json();
-    const result = data.choices?.[0]?.message?.content;
-    
-    if (result) {
-      console.log(`✅ Busca bem-sucedida! Resultado: ${result.substring(0, 200)}...`);
-    }
-    
-    return result || null;
-    
-  } catch (error) {
-    console.error("💥 ERRO na busca Perplexity:", error);
-    return null;
-  }
-}
-
 async function callAnthropic(messages: any[], systemPrompt: string): Promise<string> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY não encontrada");
@@ -162,46 +93,51 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { messages, agentName } = body;
+    const { messages, agent } = body;
     
-    if (!agentName || !messages) {
+    if (!agent || !messages) {
       return new Response(JSON.stringify({ content: "Dados inválidos." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
       });
     }
 
-    const systemPrompt = agentPersonas[agentName];
-    if (!systemPrompt) {
-      return new Response(JSON.stringify({ content: `Especialista "${agentName}" não encontrado.` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404
+    let systemPrompt = "";
+
+    if (agent.type === 'predefined') {
+      systemPrompt = agentPersonas[agent.name];
+      if (!systemPrompt) {
+        return new Response(JSON.stringify({ content: `Especialista predefinido "${agent.name}" não encontrado.` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404
+        });
+      }
+    } else if (agent.type === 'custom') {
+      const authHeader = req.headers.get('Authorization')!;
+      const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: customAgent, error } = await supabaseClient
+          .from('custom_agents')
+          .select('persona')
+          .eq('id', agent.id)
+          .single();
+
+      if (error) {
+          console.error("Error fetching custom agent persona:", error);
+          return new Response(JSON.stringify({ content: `Erro ao buscar a persona do clone customizado.` }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
+          });
+      }
+      systemPrompt = customAgent.persona;
+    } else {
+      return new Response(JSON.stringify({ content: `Tipo de agente desconhecido: "${agent.type}".` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
       });
     }
 
-    const userQuery = messages[messages.length - 1]?.content || "";
-    
-    // SEMPRE fazer busca na internet para perguntas dos usuários
-    console.log(`🤖 ${agentName} processando: "${userQuery}"`);
-    const searchContext = await searchWithPerplexity(userQuery);
-    
-    let finalSystemPrompt = systemPrompt;
-    if (searchContext) {
-      console.log(`🌐 ${agentName} obteve dados da internet!`);
-      finalSystemPrompt = `${systemPrompt}
-
-=== INFORMAÇÕES ATUALIZADAS DA INTERNET (2024) ===
-${searchContext}
-
-INSTRUÇÕES CRÍTICAS: 
-- Use PRIORITARIAMENTE essas informações atualizadas
-- Integre os dados naturalmente em seu raciocínio
-- Mantenha sua personalidade
-- NÃO mencione que fez uma busca
-- Se houver conflito entre seu conhecimento base e essas informações, PRIORIZE as informações atualizadas`;
-    } else {
-      console.log(`⚠️ ${agentName} não conseguiu dados da internet, usando conhecimento base.`);
-    }
-
-    const assistantResponse = await callAnthropic(messages, finalSystemPrompt);
+    const assistantResponse = await callAnthropic(messages, systemPrompt);
 
     return new Response(JSON.stringify({ content: assistantResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200

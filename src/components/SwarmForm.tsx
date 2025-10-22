@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -7,26 +7,73 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { availableAgents } from '@/lib/agents';
+import { useSession } from '@/contexts/SessionContext';
+import { Badge } from './ui/badge';
+
+interface AgentOption {
+  id: string;
+  name: string;
+  avatar: string;
+  type: 'predefined' | 'custom';
+}
 
 interface SwarmFormProps {
-  onSubmit: (data: { prompt: string; agents: string[]; mode: string }) => void;
+  onSubmit: (data: { prompt: string; agents: { id: string; name: string; type: 'predefined' | 'custom' }[]; mode: string }) => void;
   isLoading: boolean;
 }
 
 const SwarmForm: React.FC<SwarmFormProps> = ({ onSubmit, isLoading }) => {
   const [prompt, setPrompt] = useState('');
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
   const [mode, setMode] = useState('auto');
+  const [allAgents, setAllAgents] = useState<AgentOption[]>([]);
+  const { session, supabase } = useSession();
+
+  useEffect(() => {
+    const fetchAndCombineAgents = async () => {
+      const predefined: AgentOption[] = availableAgents.map(a => ({ ...a, type: 'predefined' }));
+      
+      if (!session?.user) {
+        setAllAgents(predefined);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('custom_agents')
+          .select('id, name');
+        if (error) throw error;
+
+        const custom: AgentOption[] = data.map(c => ({
+          id: c.id,
+          name: c.name,
+          avatar: '/placeholder.svg',
+          type: 'custom'
+        }));
+        setAllAgents([...predefined, ...custom]);
+      } catch (error) {
+        console.error("Failed to fetch custom agents for swarm", error);
+        setAllAgents(predefined);
+      }
+    };
+    fetchAndCombineAgents();
+  }, [session, supabase]);
 
   const handleAgentToggle = (agentId: string) => {
-    setSelectedAgents(prev =>
+    setSelectedAgentIds(prev =>
       prev.includes(agentId) ? prev.filter(id => id !== agentId) : [...prev, agentId]
     );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ prompt, agents: selectedAgents, mode });
+    const selectedAgentObjects = allAgents.filter(agent => selectedAgentIds.includes(agent.id));
+    const agentsForApi = selectedAgentObjects.map(agent => ({
+      id: agent.id,
+      name: agent.name,
+      type: agent.type,
+    }));
+    onSubmit({ prompt, agents: agentsForApi, mode });
   };
 
   return (
@@ -51,20 +98,21 @@ const SwarmForm: React.FC<SwarmFormProps> = ({ onSubmit, isLoading }) => {
           <div className="space-y-2">
             <Label>Selecione os Especialistas</Label>
             <div className="space-y-2">
-              {availableAgents.map(agent => (
+              {allAgents.map(agent => (
                 <div key={agent.id} className="flex items-center space-x-2">
                   <Checkbox
                     id={agent.id}
-                    checked={selectedAgents.includes(agent.name)}
-                    onCheckedChange={() => handleAgentToggle(agent.name)}
+                    checked={selectedAgentIds.includes(agent.id)}
+                    onCheckedChange={() => handleAgentToggle(agent.id)}
                     disabled={isLoading}
                   />
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={agent.avatar} alt={agent.name} />
                     <AvatarFallback>{agent.name.substring(0, 2)}</AvatarFallback>
                   </Avatar>
-                  <Label htmlFor={agent.id} className="font-normal cursor-pointer">
+                  <Label htmlFor={agent.id} className="font-normal cursor-pointer flex items-center gap-2">
                     {agent.name}
+                    {agent.type === 'custom' && <Badge variant="secondary">Custom</Badge>}
                   </Label>
                 </div>
               ))}

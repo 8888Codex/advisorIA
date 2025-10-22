@@ -5,24 +5,38 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { availableAgents } from '@/lib/agents';
-import { SendHorizonal, ArrowLeft } from 'lucide-react';
+import { SendHorizonal, ArrowLeft, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/contexts/SessionContext';
 import { ExpertCard } from '@/components/ExpertCard';
 import { Header } from '@/components/Header';
+import { CustomAgent } from './CustomClones';
+import { showError } from '@/utils/toast';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
 
+type SelectedAgent = {
+  id: string;
+  name: string;
+  avatar?: string;
+  description?: string;
+  title?: string;
+  type: 'predefined' | 'custom';
+  persona?: string;
+};
+
 const IndividualChat = () => {
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<SelectedAgent | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const { supabase } = useSession();
+  const { session, supabase } = useSession();
+  const [customAgents, setCustomAgents] = useState<CustomAgent[]>([]);
+  const [loadingCustom, setLoadingCustom] = useState(true);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -35,9 +49,36 @@ const IndividualChat = () => {
     }
   }, [messages, isLoading]);
 
-  const handleAgentSelect = (agentName: string) => {
-    setSelectedAgent(agentName);
-    setMessages([]); 
+  useEffect(() => {
+    const fetchCustomAgents = async () => {
+      if (!session?.user) {
+        setLoadingCustom(false);
+        return;
+      };
+      setLoadingCustom(true);
+      try {
+        const { data, error } = await supabase
+          .from('custom_agents')
+          .select('id, name, title, description, persona, created_at')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        setCustomAgents(data || []);
+      } catch (error) {
+        console.error("Failed to fetch custom agents for chat", error);
+        showError("Não foi possível carregar seus clones customizados.");
+      } finally {
+        setLoadingCustom(false);
+      }
+    };
+
+    if (!selectedAgent) {
+      fetchCustomAgents();
+    }
+  }, [session, selectedAgent, supabase]);
+
+  const handleAgentSelect = (agent: SelectedAgent) => {
+    setSelectedAgent(agent);
+    setMessages([]);
   };
 
   const handleNewConversation = () => {
@@ -51,7 +92,7 @@ const IndividualChat = () => {
     const userMessage: Message = { role: 'user', content: input };
     
     const messagesForApi = messages.length === 0 
-      ? [{ role: 'assistant', content: `Olá! Eu sou ${selectedAgent}. Como posso ajudar você hoje?` }, userMessage]
+      ? [{ role: 'assistant', content: `Olá! Eu sou ${selectedAgent.name}. Como posso ajudar você hoje?` }, userMessage]
       : [...messages, userMessage];
 
     setMessages(prev => [...prev, userMessage]);
@@ -60,7 +101,7 @@ const IndividualChat = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke('individual-chat', {
-        body: { messages: messagesForApi, agentName: selectedAgent },
+        body: { messages: messagesForApi, agent: selectedAgent },
       });
 
       if (error) {
@@ -85,7 +126,20 @@ const IndividualChat = () => {
     }
   };
 
-  const currentAgent = availableAgents.find(agent => agent.name === selectedAgent);
+  const currentAgent = selectedAgent;
+
+  const customAgentsForDisplay = customAgents.map(clone => ({
+    id: clone.id,
+    name: clone.name,
+    avatar: '/placeholder.svg',
+    title: clone.title || 'Clone Customizado',
+    description: clone.description || 'Um especialista de IA criado por você.',
+    tags: ['Customizado'],
+    fidelity: 'Alta' as const,
+    customizable: true,
+    type: 'custom' as const,
+    persona: clone.persona,
+  }));
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -99,11 +153,31 @@ const IndividualChat = () => {
                 Selecione um especialista para iniciar uma conversa.
               </p>
             </header>
+            
+            <h2 className="text-2xl font-bold tracking-tight mb-4">Especialistas Renomados</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {availableAgents.map(agent => (
-                <ExpertCard key={agent.id} agent={agent} onSelect={handleAgentSelect} />
+                <ExpertCard key={agent.id} agent={agent} onSelect={() => handleAgentSelect(agent)} />
               ))}
             </div>
+
+            <h2 className="text-2xl font-bold tracking-tight mt-12 mb-4">Seus Clones Customizados</h2>
+            {loadingCustom ? (
+              <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : customAgentsForDisplay.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {customAgentsForDisplay.map(agent => (
+                  <ExpertCard key={agent.id} agent={agent as any} onSelect={() => handleAgentSelect(agent)} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
+                <h3 className="text-lg font-semibold text-foreground">Nenhum clone encontrado</h3>
+                <p>Vá para a página "Criar Clones" para começar a construir seus especialistas.</p>
+              </div>
+            )}
           </main>
         </>
       ) : (
