@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -289,6 +289,64 @@ INSTRUÇÕES DE RESPOSTA:
 `,
 };
 
+interface SwarmRoundData {
+  round: number;
+  contributions: { agent: string; text: string }[];
+}
+
+async function saveSwarmSession(
+  supabase: SupabaseClient,
+  prompt: string,
+  agents: any[],
+  mode: string,
+  allRounds: SwarmRoundData[]
+) {
+  // 1. Create the session
+  const { data: sessionData, error: sessionError } = await supabase
+    .from('swarm_sessions')
+    .insert({ prompt, agents, mode })
+    .select('id')
+    .single();
+
+  if (sessionError) {
+    console.error('Error saving swarm session:', sessionError);
+    return;
+  }
+
+  const sessionId = sessionData.id;
+
+  // 2. Iterate through rounds and save them
+  for (const round of allRounds) {
+    const { data: roundData, error: roundError } = await supabase
+      .from('swarm_rounds')
+      .insert({ session_id: sessionId, round_number: round.round })
+      .select('id')
+      .single();
+
+    if (roundError) {
+      console.error(`Error saving round ${round.round}:`, roundError);
+      continue; // Skip to next round if this one fails
+    }
+
+    const roundId = roundData.id;
+
+    // 3. Prepare and save all contributions for the current round
+    const contributionsToInsert = round.contributions.map(c => ({
+      round_id: roundId,
+      agent_name: c.agent,
+      contribution_text: c.text,
+    }));
+
+    const { error: contributionsError } = await supabase
+      .from('swarm_contributions')
+      .insert(contributionsToInsert);
+
+    if (contributionsError) {
+      console.error(`Error saving contributions for round ${round.round}:`, contributionsError);
+    }
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -308,8 +366,8 @@ serve(async (req) => {
       throw new Error("A chave da API da Anthropic não foi configurada nos segredos do Supabase.");
     }
 
-    if (!userPrompt || !agentsParam) {
-      return new Response(JSON.stringify({ error: 'Prompt e especialistas são obrigatórios.' }), {
+    if (!userPrompt || !agentsParam || !mode) {
+      return new Response(JSON.stringify({ error: 'Prompt, especialistas e modo são obrigatórios.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
@@ -337,13 +395,14 @@ serve(async (req) => {
 
         if (error) {
             console.error("Error fetching custom agent personas for swarm:", error);
-            // Continue without custom personas if fetch fails
         } else {
             data.forEach((agent: any) => {
                 customPersonas[agent.id] = agent.persona;
             });
         }
     }
+
+    const allRoundsData: SwarmRoundData[] = [];
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -381,16 +440,20 @@ serve(async (req) => {
           }));
           conversationHistory.push(...assistantMessages);
 
-          const roundData = {
+          const roundData: SwarmRoundData = {
             round: i,
             contributions: contributions,
           };
+          allRoundsData.push(roundData);
 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(roundData)}\n\n`));
         }
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
         controller.close();
+        
+        // Save the entire session after streaming is complete
+        await saveSwarmSession(supabaseClient, userPrompt, selectedAgents, mode, allRoundsData);
       },
     });
 
