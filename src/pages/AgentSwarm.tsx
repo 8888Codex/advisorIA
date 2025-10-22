@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import SwarmForm from '@/components/SwarmForm';
 import SwarmDisplay from '@/components/SwarmDisplay';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Terminal } from 'lucide-react';
 
 export interface AgentContribution {
   agent: string;
@@ -71,7 +73,7 @@ const AgentSwarm = () => {
 
     eventSource.onerror = (err) => {
       console.error("Falha no EventSource:", err);
-      setError("Ocorreu um erro ao conectar com o servidor de colaboração.");
+      setError("Ocorreu um erro ao conectar com o servidor de colaboração. Verifique o console para mais detalhes.");
       setIsLoading(false);
       eventSource.close();
       eventSourceRef.current = null;
@@ -79,22 +81,30 @@ const AgentSwarm = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <h1 className="text-3xl font-bold mb-6 text-center">Enxame de Agentes IA</h1>
-      <p className="text-center text-muted-foreground mb-8">
-        Descreva seu desafio e deixe nossos especialistas digitais colaborarem para encontrar a melhor solução.
-      </p>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="flex flex-col h-full">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Enxame de Agentes IA</h1>
+        <p className="text-muted-foreground mt-1">
+          Descreva seu desafio e deixe nossos especialistas digitais colaborarem para encontrar a melhor solução.
+        </p>
+      </header>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1">
         <div className="lg:col-span-1">
           <SwarmForm onSubmit={handleStartSwarm} isLoading={isLoading} />
         </div>
-        <div className="lg:col-span-2">
-          <Card>
+        <div className="lg:col-span-2 flex flex-col">
+          <Card className="flex-1 flex flex-col">
             <CardHeader>
               <CardTitle>Painel de Colaboração</CardTitle>
             </CardHeader>
-            <CardContent>
-              {error && <p className="text-red-500">{error}</p>}
+            <CardContent className="flex-1">
+              {error && (
+                <Alert variant="destructive">
+                  <Terminal className="h-4 w-4" />
+                  <AlertTitle>Erro na Colaboração</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
               <SwarmDisplay rounds={rounds} isLoading={isLoading} />
             </CardContent>
           </Card>
