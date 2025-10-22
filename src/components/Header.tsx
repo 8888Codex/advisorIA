@@ -19,6 +19,8 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useSession } from "@/contexts/SessionContext";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -28,8 +30,25 @@ const navItems = [
 ];
 
 export function Header() {
-  const { supabase } = useSession();
+  const { session, supabase } = useSession();
   const navigate = useNavigate();
+  const [profile, setProfile] = useState<{ avatar_url: string | null, first_name: string | null } | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (session?.user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('avatar_url, first_name')
+          .eq('id', session.user.id)
+          .single();
+        if (!error && data) {
+          setProfile(data);
+        }
+      }
+    };
+    fetchProfile();
+  }, [session, supabase]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -105,7 +124,12 @@ export function Header() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
-              <CircleUser className="h-5 w-5" />
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={profile?.avatar_url || ''} alt="User avatar" />
+                <AvatarFallback>
+                  {profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : <CircleUser className="h-5 w-5" />}
+                </AvatarFallback>
+              </Avatar>
               <span className="sr-only">Menu do usuário</span>
             </Button>
           </DropdownMenuTrigger>
