@@ -37,7 +37,7 @@ serve(async (req) => {
     console.log(`📝 Query de teste: "${testQuery}"`);
 
     const requestBody = {
-      model: "llama-3.1-sonar-large-128k-online",
+      model: "llama-3-sonar-large-32k-online",
       messages: [
         {
           role: "user", 
@@ -49,6 +49,7 @@ serve(async (req) => {
     };
 
     console.log("📤 Enviando requisição para Perplexity...");
+    console.log(`🤖 Modelo usado: llama-3-sonar-large-32k-online`);
 
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
