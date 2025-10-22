@@ -81,7 +81,7 @@ const CustomClones = () => {
       });
 
       if (personaError) {
-        const errorMessage = personaError.context?.error || personaError.message;
+        const errorMessage = (personaError.context as any)?.error || personaError.message;
         throw new Error(`Etapa 1 falhou: ${errorMessage}`);
       }
       if (personaData.error) throw new Error(`Etapa 1 falhou: ${personaData.error}`);
@@ -93,7 +93,7 @@ const CustomClones = () => {
       });
 
       if (refinedError) {
-        const errorMessage = refinedError.context?.error || refinedError.message;
+        const errorMessage = (refinedError.context as any)?.error || refinedError.message;
         throw new Error(`Etapa 2 falhou: ${errorMessage}`);
       }
       if (refinedData.error) throw new Error(`Etapa 2 falhou: ${refinedData.error}`);

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
 
 const corsHeaders = {
@@ -22,7 +22,10 @@ serve(async (req) => {
 
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!anthropicApiKey) {
-      throw new Error("A chave da API da Anthropic não foi configurada.");
+      return new Response(JSON.stringify({ error: "A chave da API da Anthropic não foi configurada. Por favor, adicione-a nos segredos do seu projeto Supabase." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
     }
 
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });

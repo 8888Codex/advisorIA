@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,7 +21,10 @@ serve(async (req) => {
 
     const perplexityApiKey = Deno.env.get('PERPLEXITY_API_KEY');
     if (!perplexityApiKey) {
-      throw new Error("A chave da API da Perplexity não foi configurada.");
+      return new Response(JSON.stringify({ error: "A chave da API da Perplexity não foi configurada. Por favor, adicione-a nos segredos do seu projeto Supabase." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
     }
 
     const systemPrompt = `Você é um especialista em engenharia de prompts para IA. Sua tarefa é criar um "system prompt" detalhado para um chatbot que irá emular uma pessoa específica. O prompt deve ser escrito em português do Brasil.`;

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
@@ -353,18 +353,19 @@ serve(async (req) => {
   }
 
   try {
-    const anthropic = new Anthropic({
-      apiKey: Deno.env.get("ANTHROPIC_API_KEY"),
-    });
+    const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!anthropicApiKey) {
+      return new Response(JSON.stringify({ error: "A chave da API da Anthropic não foi configurada nos segredos do Supabase." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
+    }
+    const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
     const url = new URL(req.url);
     const userPrompt = url.searchParams.get('prompt');
     const agentsParam = url.searchParams.get('agents');
     const mode = url.searchParams.get('mode');
-
-    if (!Deno.env.get("ANTHROPIC_API_KEY")) {
-      throw new Error("A chave da API da Anthropic não foi configurada nos segredos do Supabase.");
-    }
 
     if (!userPrompt || !agentsParam || !mode) {
       return new Response(JSON.stringify({ error: 'Prompt, especialistas e modo são obrigatórios.' }), {
