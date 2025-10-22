@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Bot, Loader2 } from 'lucide-react';
 
 const Login = () => {
   const { session } = useSession();
@@ -70,6 +71,10 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          <div className="flex justify-center items-center gap-2 mb-4">
+            <Bot className="h-8 w-8" />
+            <h1 className="text-2xl font-bold">AdvisorIA</h1>
+          </div>
           <CardTitle className="text-2xl">{isSignUp ? 'Crie sua conta' : 'Acesse sua conta'}</CardTitle>
           <CardDescription>
             {isSignUp ? 'Preencha os campos para se cadastrar.' : 'Bem-vindo de volta!'}
@@ -77,6 +82,7 @@ const Login = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <Button variant="outline" className="w-full" onClick={() => handleOAuthLogin('google')} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 110.3 512 0 401.7 0 265.2 0 128.5 110.3 18.2 244 18.2c71.2 0 130.2 27.7 174.3 68.2l-63.4 61.8C325.1 125.7 289.3 106.4 244 106.4c-74.9 0-136.2 61.4-136.2 137.2 0 75.8 61.3 137.2 136.2 137.2 88.1 0 112.2-64.3 115.6-97.2H244v-75.5h236.3c2.4 12.7 3.7 26.5 3.7 41z"></path></svg>}
             {isSignUp ? 'Cadastrar com Google' : 'Entrar com Google'}
           </Button>
           <div className="relative">
@@ -140,7 +146,8 @@ const Login = () => {
             </div>
             {error && <p className="text-sm text-destructive text-center">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Aguarde...' : isSignUp ? 'Cadastrar' : 'Entrar'}
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSignUp ? 'Cadastrar' : 'Entrar'}
             </Button>
           </form>
         </CardContent>
