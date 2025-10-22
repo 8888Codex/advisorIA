@@ -5,9 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// This function is now the main handler
 serve(async (req) => {
-  console.log("🔧 FUNÇÃO DE ATIVAÇÃO - VERSÃO SIMPLIFICADA");
-
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -15,133 +15,137 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const { action } = body;
-
-    console.log(`📋 Ação solicitada: ${action}`);
+    console.log(`[ACTIVATE_FN] Received action: ${action}`);
 
     if (action === 'check_status') {
-      const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
-      
-      return new Response(JSON.stringify({
-        success: true,
-        status: {
-          api_key_configured: !!apiKey,
-          api_key_length: apiKey ? apiKey.length : 0,
-          api_key_preview: apiKey ? `${apiKey.substring(0, 8)}...` : null,
-          environment: "Supabase Edge Functions",
-          timestamp: new Date().toISOString()
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
+      return checkStatus();
     }
 
     if (action === 'test_connection') {
-      const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
-      
-      if (!apiKey) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: "PERPLEXITY_API_KEY não encontrada nos segredos do Supabase"
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        });
-      }
-
-      try {
-        console.log("🧪 Testando conexão com a Perplexity...");
-        
-        const response = await fetch("https://api.perplexity.ai/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: "llama-3-sonar-large-32k-online",
-            messages: [
-              {
-                role: "system",
-                content: "You are a research assistant. Provide current and accurate information."
-              },
-              {
-                role: "user",
-                content: "What is the latest iPhone model from Apple in 2024? Include iPhone 16 details."
-              }
-            ],
-            max_tokens: 500,
-            temperature: 0.1,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ Erro da API: ${response.status} - ${errorText}`);
-          
-          return new Response(JSON.stringify({
-            success: false,
-            error: `Erro da API Perplexity: ${response.status} - ${errorText}`
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200
-          });
-        }
-
-        const data = await response.json();
-        const result = data.choices?.[0]?.message?.content;
-
-        if (!result) {
-          return new Response(JSON.stringify({
-            success: false,
-            error: "Resposta vazia da API"
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200
-          });
-        }
-
-        console.log("✅ Teste de conexão bem-sucedido!");
-        
-        return new Response(JSON.stringify({
-          success: true,
-          message: "Conexão com a API da Perplexity estabelecida com sucesso!",
-          test_result: result
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        });
-
-      } catch (error) {
-        console.error("💥 Erro na conexão:", error);
-        
-        return new Response(JSON.stringify({
-          success: false,
-          error: `Erro de conexão: ${error.message}`
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        });
-      }
+      return testConnection();
     }
 
-    // Ação não reconhecida
+    // If action is not recognized
     return new Response(JSON.stringify({
       success: false,
-      error: "Ação não reconhecida. Use 'check_status' ou 'test_connection'"
+      error: `Ação não reconhecida: ${action}. Use 'check_status' ou 'test_connection'.`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400
+      status: 200 // Return 200 OK to avoid client-side crash
     });
 
   } catch (error) {
-    console.error("💥 ERRO CRÍTICO na função de ativação:", error);
+    console.error("💥 [ACTIVATE_FN] Erro crítico ao processar a requisição:", error);
+    // This error happens if req.json() fails or something fundamental breaks
     return new Response(JSON.stringify({
       success: false,
-      error: `Erro crítico: ${error.message}`
+      error: `Erro crítico na função: ${error.message}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500
+      status: 500 // A 500 is appropriate for a server-level crash
     });
   }
 })
+
+// Helper function for checking status
+function checkStatus() {
+  console.log("[ACTIVATE_FN] Executando checkStatus...");
+  const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
+  
+  const statusPayload = {
+    success: true,
+    status: {
+      api_key_configured: !!apiKey,
+      api_key_length: apiKey ? apiKey.length : 0,
+      api_key_preview: apiKey ? `${apiKey.substring(0, 8)}...` : null,
+    }
+  };
+  console.log("[ACTIVATE_FN] Status verificado:", statusPayload.status);
+  
+  return new Response(JSON.stringify(statusPayload), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status: 200
+  });
+}
+
+// Helper function for testing the connection
+async function testConnection() {
+  console.log("[ACTIVATE_FN] Executando testConnection...");
+  const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
+
+  if (!apiKey) {
+    console.log("[ACTIVATE_FN] Erro: Chave da API não configurada.");
+    return new Response(JSON.stringify({
+      success: false,
+      error: "PERPLEXITY_API_KEY não encontrada nos segredos do Supabase."
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200 // Return 200 OK
+    });
+  }
+
+  try {
+    console.log("[ACTIVATE_FN] Enviando requisição para a Perplexity API...");
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3-sonar-large-32k-online",
+        messages: [{ role: "user", content: "What is the latest iPhone model in 2024?" }],
+        max_tokens: 100,
+      }),
+    });
+
+    console.log(`[ACTIVATE_FN] Perplexity API respondeu com status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[ACTIVATE_FN] Erro da API Perplexity:", errorText);
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Erro da API Perplexity (Status: ${response.status})`,
+        details: errorText
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 // Return 200 OK
+      });
+    }
+
+    const data = await response.json();
+    const result = data.choices?.[0]?.message?.content;
+
+    if (!result) {
+      console.log("[ACTIVATE_FN] Erro: Resposta da API vazia.");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Resposta da API da Perplexity veio vazia."
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 // Return 200 OK
+      });
+    }
+
+    console.log("[ACTIVATE_FN] Teste de conexão bem-sucedido!");
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Conexão com a API da Perplexity estabelecida com sucesso!",
+      test_result: result
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
+    });
+
+  } catch (error) {
+    console.error("💥 [ACTIVATE_FN] Erro durante a chamada fetch:", error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: `Erro de rede ao tentar conectar com a Perplexity: ${error.message}`
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200 // Return 200 OK
+    });
+  }
+}
