@@ -3,12 +3,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { availableAgents } from '@/lib/agents';
 import { SendHorizonal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/contexts/SessionContext';
+import { ExpertCard } from '@/components/ExpertCard';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -83,36 +83,21 @@ const IndividualChat = () => {
   const currentAgent = availableAgents.find(agent => agent.name === selectedAgent);
 
   return (
-    <div className="container mx-auto p-4 md:p-8 h-full flex flex-col">
-      <h1 className="text-3xl font-bold mb-6 text-center">Chat Individual</h1>
+    <div className="container mx-auto p-4 md:p-0 h-full flex flex-col">
       {!selectedAgent ? (
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Selecione um Especialista</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select onValueChange={handleAgentSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Escolha com quem conversar..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAgents.map(agent => (
-                    <SelectItem key={agent.id} value={agent.name}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={agent.avatar} alt={agent.name} />
-                          <AvatarFallback>{agent.name.substring(0, 2)}</AvatarFallback>
-                        </Avatar>
-                        <span>{agent.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-        </div>
+        <>
+          <header className="mb-8 text-center">
+            <h1 className="text-3xl font-bold tracking-tight">Chat Individual</h1>
+            <p className="text-muted-foreground mt-1">
+              Selecione um especialista para iniciar uma conversa.
+            </p>
+          </header>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableAgents.map(agent => (
+              <ExpertCard key={agent.id} agent={agent} onSelect={handleAgentSelect} />
+            ))}
+          </div>
+        </>
       ) : (
         <Card className="flex-1 flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between border-b">
@@ -152,7 +137,7 @@ const IndividualChat = () => {
                           : 'bg-muted'
                       )}
                     >
-                      <p className="text-sm">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     </div>
                   </div>
                 ))}
