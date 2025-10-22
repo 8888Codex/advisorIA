@@ -54,66 +54,60 @@ export const ConversationList: React.FC<ConversationListProps> = ({ agent, onSel
   }, [agent]);
 
   return (
-    <>
-      <Header />
-      <main className="flex-1 w-full max-w-4xl mx-auto p-4 md:p-8">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="outline" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Conversas com {agent.name}</h1>
-            <p className="text-muted-foreground">Selecione uma conversa para continuar ou inicie uma nova.</p>
-          </div>
+    <div className="w-full max-w-4xl mx-auto p-4 md:p-8">
+      <div className="flex items-center gap-4 mb-8">
+        <Button variant="outline" size="icon" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Conversas com {agent.name}</h1>
+          <p className="text-muted-foreground">Selecione uma conversa para continuar ou inicie uma nova.</p>
         </div>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Histórico</CardTitle>
-              <CardDescription>Suas conversas recentes com este especialista.</CardDescription>
-            </div>
-            <Button onClick={onNewConversation}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Nova Conversa
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[50vh]">
-              {isLoading ? (
-                <div className="flex justify-center items-center h-full">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : conversations.length > 0 ? (
-                <div className="space-y-2">
-                  {conversations.map(conv => (
-                    <button
-                      key={conv.id}
-                      onClick={() => onSelectConversation(conv)}
-                      className="w-full text-left p-3 rounded-md hover:bg-muted transition-colors flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{conv.title || 'Conversa sem título'}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(conv.updated_at), { addSuffix: true, locale: ptBR })}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground py-10">
-                  <p>Nenhuma conversa encontrada.</p>
-                  <p>Clique em "Nova Conversa" para começar.</p>
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </main>
-    </>
+      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Histórico</CardTitle>
+            <CardDescription>Suas conversas recentes com este especialista.</CardDescription>
+          </div>
+          <Button onClick={onNewConversation}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Nova Conversa
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[50vh]">
+            {isLoading ? (
+              <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : conversations.length > 0 ? (
+              <div className="space-y-2">
+                {conversations.map(conv => (
+                  <button
+                    key={conv.id}
+                    onClick={() => onSelectConversation(conv)}
+                    className="w-full text-left p-3 rounded-md hover:bg-muted transition-colors flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{conv.title || 'Conversa sem título'}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(conv.updated_at), { addSuffix: true, locale: ptBR })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-10">
+                <p>Nenhuma conversa encontrada.</p>
+                <p>Clique em "Nova Conversa" para começar.</p>
+              </div>
+            )}
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
-
-// Dummy Header component to avoid breaking the layout
-const Header = () => <div className="h-16" />;

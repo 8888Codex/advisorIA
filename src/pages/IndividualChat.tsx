@@ -4,7 +4,6 @@ import { Loader2 } from 'lucide-react';
 import { useSession } from '@/contexts/SessionContext';
 import { availableAgents } from '@/lib/agents';
 import { ExpertCard } from '@/components/ExpertCard';
-import { Header } from '@/components/Header';
 import { CustomAgent } from './CustomClones';
 import { showError } from '@/utils/toast';
 import { ConversationList } from '@/components/ConversationList';
@@ -128,21 +127,18 @@ const IndividualChat = () => {
       id: clone.id, name: clone.name, avatar: '/placeholder.svg', title: clone.title || 'Clone Customizado', description: clone.description || 'Um especialista de IA criado por você.', tags: ['Customizado'], fidelity: 'Alta' as const, customizable: true, type: 'custom' as const,
     }));
     return (
-      <>
-        <Header />
-        <main className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-8">
-          <header className="mb-8 text-center"><h1 className="text-3xl font-bold tracking-tight">Chat Individual</h1><p className="text-muted-foreground mt-1">Selecione um especialista para iniciar uma conversa.</p></header>
-          <h2 className="text-2xl font-bold tracking-tight mb-4">Especialistas Renomados</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{availableAgents.map(agent => (<ExpertCard key={agent.id} agent={agent} onSelect={() => handleAgentSelect(agent)} />))}</div>
-          <h2 className="text-2xl font-bold tracking-tight mt-12 mb-4">Seus Clones Customizados</h2>
-          {loadingCustom ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : customAgentsForDisplay.length > 0 ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{customAgentsForDisplay.map(agent => (<ExpertCard key={agent.id} agent={agent as any} onSelect={() => handleAgentSelect(agent)} />))}</div> : <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg"><h3 className="text-lg font-semibold text-foreground">Nenhum clone encontrado</h3><p>Vá para a página "Criar Clones" para começar.</p></div>}
-        </main>
-      </>
+      <div className="w-full max-w-7xl mx-auto p-4 md:p-8">
+        <header className="mb-8 text-center"><h1 className="text-3xl font-bold tracking-tight">Chat Individual</h1><p className="text-muted-foreground mt-1">Selecione um especialista para iniciar uma conversa.</p></header>
+        <h2 className="text-2xl font-bold tracking-tight mb-4">Especialistas Renomados</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{availableAgents.map(agent => (<ExpertCard key={agent.id} agent={agent} onSelect={() => handleAgentSelect(agent)} />))}</div>
+        <h2 className="text-2xl font-bold tracking-tight mt-12 mb-4">Seus Clones Customizados</h2>
+        {loadingCustom ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : customAgentsForDisplay.length > 0 ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{customAgentsForDisplay.map(agent => (<ExpertCard key={agent.id} agent={agent as any} onSelect={() => handleAgentSelect(agent)} />))}</div> : <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg"><h3 className="text-lg font-semibold text-foreground">Nenhum clone encontrado</h3><p>Vá para a página "Criar Clones" para começar.</p></div>}
+      </div>
     );
   };
 
   if (view === 'loading') {
-    return <div className="h-screen flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin" /></div>;
+    return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin" /></div>;
   }
   if (view === 'conversation_list' && selectedAgent) {
     return <ConversationList agent={selectedAgent} onSelectConversation={handleSelectConversation} onNewConversation={handleNewConversation} onBack={handleBackToAgentSelection} />;
@@ -150,7 +146,7 @@ const IndividualChat = () => {
   if (view === 'chat_view' && selectedAgent) {
     return <ChatInterface agent={selectedAgent} initialConversation={selectedConversation} onBack={handleBackToConversationList} onConversationDeleted={handleBackToConversationList} />;
   }
-  return <div className="h-screen flex flex-col bg-background">{renderAgentSelection()}</div>;
+  return renderAgentSelection();
 };
 
 export default IndividualChat;
