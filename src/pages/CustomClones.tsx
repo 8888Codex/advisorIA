@@ -101,13 +101,18 @@ const CustomClones = () => {
       return;
     }
     setIsGeneratingPersona(true);
-    const toastId = showLoading('Gerando persona estruturada...');
+    const toastId = showLoading('Gerando persona completa...');
     try {
       const { data, error } = await supabase.functions.invoke('generate-structured-persona', { body: { name } });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
+
+      form.setValue('title', data.title, { shouldValidate: true });
+      form.setValue('description', data.description, { shouldValidate: true });
+      form.setValue('emoji', data.emoji, { shouldValidate: true });
       form.setValue('persona', data.persona, { shouldValidate: true });
-      toast.success('Persona gerada com sucesso!', { id: toastId });
+
+      toast.success('Todos os campos foram preenchidos com IA!', { id: toastId });
     } catch (error: any) {
       let detail = "Ocorreu um erro desconhecido.";
       if (error.context && error.context.error) detail = error.context.error;
