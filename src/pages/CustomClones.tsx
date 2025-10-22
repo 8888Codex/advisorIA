@@ -74,7 +74,12 @@ const CustomClones = () => {
         body: { name },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Try to extract the detailed error message from the function's response
+        const detailedError = error.context?.error?.message || error.message;
+        throw new Error(detailedError);
+      }
+      
       if (data.error) throw new Error(data.error);
 
       form.setValue('persona', data.persona, { shouldValidate: true });
@@ -154,7 +159,7 @@ const CustomClones = () => {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription><FormMessage /></FormMessage></FormItem>
                 )} />
                 <FormField control={form.control} name="title" render={({ field }) => (
                   <FormItem><FormLabel>Cargo / Título</FormLabel><FormControl><Input placeholder="Ex: Co-fundador da Apple" {...field} /></FormControl><FormMessage /></FormItem>
