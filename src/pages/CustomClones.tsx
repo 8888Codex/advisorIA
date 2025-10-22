@@ -127,13 +127,17 @@ const CustomClones = () => {
   };
 
   const onSubmit = async (values: z.infer<typeof cloneSchema>) => {
+    if (!session?.user) {
+      showError('Você precisa estar logado para criar um clone.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       let response;
       if (editingClone) {
         response = await supabase.from('custom_agents').update(values).eq('id', editingClone.id).select().single();
       } else {
-        response = await supabase.from('custom_agents').insert(values).select().single();
+        response = await supabase.from('custom_agents').insert({ ...values, user_id: session.user.id }).select().single();
       }
 
       if (response.error) throw response.error;
