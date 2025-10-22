@@ -6,15 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
-const availableAgents = [
-  { id: 'steve-jobs', name: 'Steve Jobs', avatar: '/steve-jobs.png' },
-  { id: 'elon-musk', name: 'Elon Musk', avatar: '/elon-musk.png' },
-  { id: 'russell-brunson', name: 'Russell Brunson', avatar: '/russell-brunson.png' },
-  { id: 'warren-buffett', name: 'Warren Buffett', avatar: '/warren-buffett.png' },
-  { id: 'jeff-bezos', name: 'Jeff Bezos', avatar: '/jeff-bezos.png' },
-  { id: 'naval-ravikant', name: 'Naval Ravikant', avatar: '/naval-ravikant.png' },
-];
+import { availableAgents } from '@/lib/agents';
 
 interface SwarmFormProps {
   onSubmit: (data: { prompt: string; agents: string[]; mode: string }) => void;
