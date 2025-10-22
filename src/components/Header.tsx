@@ -44,7 +44,7 @@ export function Header() {
           className="flex items-center gap-2 text-lg font-semibold md:text-base"
         >
           <Bot className="h-6 w-6" />
-          <span className="sr-only">AdvisorIA</span>
+          <span>AdvisorIA</span>
         </NavLink>
         {navItems.map((item) => (
           <NavLink
@@ -53,7 +53,9 @@ export function Header() {
             className={({ isActive }) =>
               cn(
                 "transition-colors hover:text-foreground",
-                isActive ? "text-foreground" : "text-muted-foreground"
+                isActive
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground"
               )
             }
           >
@@ -75,7 +77,7 @@ export function Header() {
               className="flex items-center gap-2 text-lg font-semibold"
             >
               <Bot className="h-6 w-6" />
-              <span className="sr-only">AdvisorIA</span>
+              <span>AdvisorIA</span>
             </NavLink>
             {navItems.map((item) => (
               <NavLink
@@ -84,7 +86,9 @@ export function Header() {
                 className={({ isActive }) =>
                   cn(
                     "hover:text-foreground",
-                    isActive ? "text-foreground" : "text-muted-foreground"
+                    isActive
+                      ? "text-foreground font-semibold"
+                      : "text-muted-foreground"
                   )
                 }
               >
