@@ -80,9 +80,9 @@ const CustomClones = () => {
 
       if (personaError) {
         const errorMessage = personaError.context?.error?.message || personaError.message;
-        throw new Error(errorMessage);
+        throw new Error(`Etapa 1 falhou: ${errorMessage}`);
       }
-      if (personaData.error) throw new Error(personaData.error);
+      if (personaData.error) throw new Error(`Etapa 1 falhou: ${personaData.error}`);
 
       // Step 2: Refine the persona
       toast.loading('Passo 2/2: Refinando a estrutura da persona...', { id: toastId });
@@ -92,9 +92,9 @@ const CustomClones = () => {
 
       if (refinedError) {
         const errorMessage = refinedError.context?.error?.message || refinedError.message;
-        throw new Error(errorMessage);
+        throw new Error(`Etapa 2 falhou: ${errorMessage}`);
       }
-      if (refinedData.error) throw new Error(refinedData.error);
+      if (refinedData.error) throw new Error(`Etapa 2 falhou: ${refinedData.error}`);
 
       form.setValue('persona', refinedData.refinedPersona, { shouldValidate: true });
       toast.success('Persona gerada e refinada com sucesso!', { id: toastId });
