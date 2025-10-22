@@ -369,44 +369,68 @@ serve(async (req) => {
 
     const userQuestion = messages[messages.length - 1].content;
 
-    // Etapa 1: Análise de Intenção
-    const intentAnalysisResponse = await anthropic.messages.create({
+    // Etapa 1: Porteiro Otimizado - Análise de Classificação Objetiva
+    const gatekeeperResponse = await anthropic.messages.create({
       model: "claude-3-haiku-20240307",
-      max_tokens: 150,
-      system: `Você é um assistente especialista. Sua tarefa é determinar se uma pergunta direcionada a uma persona específica requer acesso à internet em tempo real para ser respondida de forma precisa e abrangente. Responda APENAS com um objeto JSON com duas chaves: "search_needed" (booleano) e "query" (um termo de busca conciso e eficaz se a busca for necessária, caso contrário, uma string vazia).`,
+      max_tokens: 100,
+      system: `Você é um classificador de texto especializado. Analise a pergunta do usuário e determine se ela contém:
+      
+      CRITÉRIOS PARA BUSCA (responda true se QUALQUER um for verdadeiro):
+      - Nomes específicos de empresas, produtos, pessoas ou marcas
+      - Palavras temporais como: "hoje", "esta semana", "recente", "último", "atual", "agora", "2024", "2025"
+      - Pedidos explícitos de pesquisa como: "pesquise", "busque", "encontre dados sobre", "analise o mercado"
+      - Referências a eventos, notícias ou dados que mudam com o tempo
+      
+      Responda APENAS com JSON válido: {"search_needed": boolean, "query": "string"}
+      Se search_needed for true, crie uma query de busca concisa e específica.
+      Se search_needed for false, deixe query como string vazia.`,
       messages: [{
         role: "user",
-        content: `Persona: ${agentName}. Pergunta do Usuário: "${userQuestion}". Isso requer uma busca na web por eventos atuais, dados recentes ou informações específicas e oportunas?`
+        content: `Pergunta do usuário: "${userQuestion}"`
       }],
     });
 
     let searchContext = null;
+    let searchQuery = "";
+    
     try {
-      const intentJson = JSON.parse(intentAnalysisResponse.content[0].text);
-      if (intentJson.search_needed && intentJson.query) {
+      const gatekeeperJson = JSON.parse(gatekeeperResponse.content[0].text);
+      
+      if (gatekeeperJson.search_needed && gatekeeperJson.query) {
+        searchQuery = gatekeeperJson.query;
+        console.log(`🔍 Porteiro decidiu buscar. Query: "${searchQuery}"`);
+        
         // Etapa 2: Busca Condicional
-        console.log(`Realizando busca para a consulta: "${intentJson.query}"`);
-        searchContext = await searchWithPerplexity(intentJson.query);
+        searchContext = await searchWithPerplexity(searchQuery);
+        
+        if (searchContext) {
+          console.log(`✅ Busca realizada com sucesso. Dados obtidos.`);
+        } else {
+          console.log(`❌ Busca falhou ou retornou vazio.`);
+        }
+      } else {
+        console.log(`⚡ Porteiro decidiu NÃO buscar. Resposta rápida.`);
       }
     } catch (e) {
-      console.error("Não foi possível analisar o JSON da análise de intenção:", e);
+      console.error("Erro ao analisar resposta do porteiro:", e);
+      console.log(`🔄 Fallback: Continuando sem busca.`);
     }
 
-    // Etapa 3: Síntese
+    // Etapa 3: Síntese e Geração da Resposta Final
     const finalMessages = [...messages];
+    
     if (searchContext) {
+      // Injetar contexto da busca na última mensagem
       const lastMessage = finalMessages.pop();
       if (lastMessage) {
-        const augmentedContent = `
-${lastMessage.content}
+        const augmentedContent = `${lastMessage.content}
 
 ---
-[Nota Interna: O seguinte é o contexto de uma busca na internet em tempo real. Use esta informação para enriquecer sua resposta, mas não mencione a busca ou esta nota. Fale com sua própria voz, confiando em seus princípios fundamentais e integrando esses fatos naturalmente.]
-
-Resultados da Busca:
+[CONTEXTO INTERNO: Dados recentes da internet sobre "${searchQuery}":
 ${searchContext}
----
-`;
+
+INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente em seu raciocínio e mantenha sua persona.]
+---`;
         finalMessages.push({ ...lastMessage, content: augmentedContent });
       }
     }

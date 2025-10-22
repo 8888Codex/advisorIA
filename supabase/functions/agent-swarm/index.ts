@@ -359,44 +359,65 @@ serve(async (req) => {
           const agentPromises = selectedAgents.map(async (agent) => {
             const persona = agentPersonas[agent] || "Você é um assistente de IA prestativo.";
             
-            // Etapa 1: Análise de Intenção
-            const intentAnalysisResponse = await anthropic.messages.create({
-                model: "claude-3-haiku-20240307",
-                max_tokens: 150,
-                system: `Você é um assistente especialista. Sua tarefa é determinar se uma pergunta direcionada a uma persona específica requer acesso à internet em tempo real para ser respondida de forma precisa e abrangente. Responda APENAS com um objeto JSON com duas chaves: "search_needed" (booleano) e "query" (um termo de busca conciso e eficaz se a busca for necessária, caso contrário, uma string vazia).`,
-                messages: [{
-                    role: "user",
-                    content: `Persona: ${agent}. Desafio Original do Usuário: "${userPrompt}". Isso requer uma busca na web por eventos atuais, dados recentes ou informações específicas e oportunas para fornecer uma contribuição valiosa?`
-                }],
+            // Etapa 1: Porteiro Otimizado para cada agente
+            const gatekeeperResponse = await anthropic.messages.create({
+              model: "claude-3-haiku-20240307",
+              max_tokens: 100,
+              system: `Você é um classificador de texto especializado. Analise o desafio do usuário e determine se ele contém:
+              
+              CRITÉRIOS PARA BUSCA (responda true se QUALQUER um for verdadeiro):
+              - Nomes específicos de empresas, produtos, pessoas ou marcas
+              - Palavras temporais como: "hoje", "esta semana", "recente", "último", "atual", "agora", "2024", "2025"
+              - Pedidos explícitos de pesquisa como: "pesquise", "busque", "encontre dados sobre", "analise o mercado"
+              - Referências a eventos, notícias ou dados que mudam com o tempo
+              
+              Responda APENAS com JSON válido: {"search_needed": boolean, "query": "string"}
+              Se search_needed for true, crie uma query de busca concisa e específica.
+              Se search_needed for false, deixe query como string vazia.`,
+              messages: [{
+                role: "user",
+                content: `Agente: ${agent}. Desafio: "${userPrompt}"`
+              }],
             });
 
             let searchContext = null;
+            
             try {
-                const intentJson = JSON.parse(intentAnalysisResponse.content[0].text);
-                if (intentJson.search_needed && intentJson.query) {
-                    // Etapa 2: Busca Condicional
-                    console.log(`Agente ${agent} realizando busca para a consulta: "${intentJson.query}"`);
-                    searchContext = await searchWithPerplexity(intentJson.query);
+              const gatekeeperJson = JSON.parse(gatekeeperResponse.content[0].text);
+              
+              if (gatekeeperJson.search_needed && gatekeeperJson.query) {
+                console.log(`🔍 Agente ${agent} decidiu buscar: "${gatekeeperJson.query}"`);
+                
+                // Etapa 2: Busca Condicional
+                searchContext = await searchWithPerplexity(gatekeeperJson.query);
+                
+                if (searchContext) {
+                  console.log(`✅ Agente ${agent} obteve dados da busca.`);
+                } else {
+                  console.log(`❌ Busca do agente ${agent} falhou.`);
                 }
+              } else {
+                console.log(`⚡ Agente ${agent} decidiu NÃO buscar.`);
+              }
             } catch (e) {
-                console.error(`Agente ${agent} não conseguiu analisar o JSON da análise de intenção:`, e);
+              console.error(`Erro no porteiro do agente ${agent}:`, e);
             }
 
             // Etapa 3: Síntese
             const finalMessagesForAgent = [...conversationHistory];
             let taskForAgent = `Sua tarefa: Forneça sua próxima contribuição para resolver o desafio. Seja conciso e construa sobre as ideias anteriores. Não repita seu nome ou cargo.`;
+            
             if (searchContext) {
-                taskForAgent = `
-${taskForAgent}
+              taskForAgent = `${taskForAgent}
 
 ---
-[Nota Interna: O seguinte é o contexto de uma busca na internet em tempo real. Use esta informação para enriquecer sua resposta, mas não mencione a busca ou esta nota. Fale com sua própria voz, confiando em seus princípios fundamentais e integrando esses fatos naturalmente.]
-
-Resultados da Busca:
+[CONTEXTO INTERNO: Dados recentes da internet relevantes para sua contribuição:
 ${searchContext}
----
-`;
+
+INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente em seu raciocínio e mantenha sua persona.]
+---`;
             }
+            
             finalMessagesForAgent.push({ role: 'user', content: taskForAgent });
 
             const response = await anthropic.messages.create({
@@ -442,7 +463,7 @@ ${searchContext}
   } catch (error) {
     console.error(error);
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...cors Headers, 'Content-Type': 'application/json' },
       status: 500,
     });
   }
