@@ -25,10 +25,10 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/chat" element={<IndividualChat />} />
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/agent-swarm" element={<AgentSwarm />} />
-              <Route path="/chat" element={<IndividualChat />} />
               <Route path="/clones" element={<CustomClones />} />
             </Route>
             <Route path="*" element={<NotFound />} />
