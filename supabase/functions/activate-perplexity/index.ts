@@ -93,7 +93,7 @@ async function testConnection() {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3-sonar-large-32k-online",
+        model: "llama-3-sonar-small-32k-online",
         messages: [{ role: "user", content: "What is the latest iPhone model in 2024?" }],
         max_tokens: 100,
       }),

@@ -32,7 +32,7 @@ serve(async (req) => {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3-sonar-large-32k-online",
+        model: "llama-3-sonar-small-32k-online",
         messages: [
           {
             role: "system",

@@ -305,7 +305,7 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3-sonar-large-32k-online", // MESMO MODELO QUE FUNCIONA NO TESTE
+        model: "llama-3-sonar-small-32k-online",
         messages: [{ role: "user", content: query }],
       }),
     });
@@ -341,7 +341,7 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const userPrompt = url.searchParams.get('prompt');
-    const agentsParam = url.searchParams.get('agents');
+    const agentsParam = url.search_params.get('agents');
     const mode = url.searchParams.get('mode');
 
     if (!Deno.env.get("ANTHROPIC_API_KEY")) {
