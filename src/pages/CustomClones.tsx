@@ -76,26 +76,17 @@ const CustomClones = () => {
       return;
     }
     setIsGeneratingPersona(true);
-    const toastId = showLoading('Iniciando geração de persona...');
+    const toastId = showLoading('Gerando persona estruturada...');
     try {
-      toast.loading('Passo 1/2: Pesquisando e gerando a persona base...', { id: toastId });
-      const { data: personaData, error: personaError } = await supabase.functions.invoke('generate-persona', {
+      const { data, error } = await supabase.functions.invoke('generate-structured-persona', {
         body: { name },
       });
 
-      if (personaError) throw personaError;
-      if (personaData.error) throw new Error(`Etapa 1 falhou: ${personaData.error}`);
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
-      toast.loading('Passo 2/2: Refinando a estrutura da persona...', { id: toastId });
-      const { data: refinedData, error: refinedError } = await supabase.functions.invoke('refine-persona', {
-        body: { personaText: personaData.persona, agentName: name },
-      });
-
-      if (refinedError) throw refinedError;
-      if (refinedData.error) throw new Error(`Etapa 2 falhou: ${refinedData.error}`);
-
-      form.setValue('persona', refinedData.refinedPersona, { shouldValidate: true });
-      toast.success('Persona gerada e refinada com sucesso!', { id: toastId });
+      form.setValue('persona', data.persona, { shouldValidate: true });
+      toast.success('Persona gerada com sucesso!', { id: toastId });
     } catch (error: any) {
       let detail = "Ocorreu um erro desconhecido.";
       if (error.context && error.context.error) {

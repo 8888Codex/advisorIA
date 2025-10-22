@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
 
@@ -12,9 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const { personaText, agentName } = await req.json();
-    if (!personaText || !agentName) {
-      return new Response(JSON.stringify({ error: 'Texto da persona e nome do agente são obrigatórios.' }), {
+    const { name } = await req.json();
+    if (!name) {
+      return new Response(JSON.stringify({ error: 'O nome é obrigatório.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
@@ -22,7 +23,7 @@ serve(async (req) => {
 
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!anthropicApiKey) {
-      return new Response(JSON.stringify({ error: "A chave da API da Anthropic não foi configurada. Por favor, adicione-a nos segredos do seu projeto Supabase." }), {
+      return new Response(JSON.stringify({ error: "A chave da API da Anthropic não foi configurada." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       });
@@ -30,10 +31,12 @@ serve(async (req) => {
 
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
-    const systemPrompt = `Você é um Engenheiro de Prompt de IA de elite, especializado em criar personas de chatbot robustas e detalhadas. Sua tarefa é pegar um texto de persona bruto e reestruturá-lo em um formato específico e altamente eficaz, em português do Brasil. O formato final DEVE seguir a estrutura dos exemplos fornecidos.`;
+    const systemPrompt = `Você é um Engenheiro de Prompt de IA de elite, especializado em criar personas de chatbot robustas e detalhadas. Sua tarefa é, a partir de um nome, usar seu vasto conhecimento para gerar uma persona estruturada em um formato específico e altamente eficaz, em português do Brasil. O formato final DEVE seguir a estrutura fornecida.`;
 
     const userPrompt = `
-Aqui está um exemplo da estrutura de persona que você DEVE seguir:
+Gere uma persona estruturada para **${name}**. Use seu conhecimento sobre esta figura pública para preencher cada seção da forma mais detalhada e autêntica possível.
+
+A estrutura que você DEVE seguir é:
 \`\`\`
 # System Prompt: [Nome do Agente]
 <identity>
@@ -71,31 +74,24 @@ INSTRUÇÕES DE RESPOSTA:
 4. CRÍTICO: Responda sempre em texto direto, SEM descrições de ações entre asteriscos (*ação*). Fale diretamente.
 \`\`\`
 
-Agora, pegue o seguinte texto de persona bruto para **${agentName}** e reformate-o EXATAMENTE na estrutura acima. Seja criativo e infira os detalhes para cada seção com base no texto fornecido.
-
-**Texto Bruto:**
-"""
-${personaText}
-"""
-
-Sua resposta final deve ser APENAS o prompt reformatado, começando com "# System Prompt: ${agentName}".
+Sua resposta final deve ser APENAS o prompt reformatado, começando com "# System Prompt: ${name}".
 `;
 
     const response = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307",
+      model: "claude-3-sonnet-20240229",
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     });
 
-    const refinedPersona = response.content[0].text;
+    const persona = response.content[0].text;
 
-    return new Response(JSON.stringify({ refinedPersona }), {
+    return new Response(JSON.stringify({ persona }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("--- Error in generate-structured-persona function ---", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
