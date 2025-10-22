@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -66,7 +65,7 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
   console.log(`📝 Query: "${query}"`);
   
   if (!apiKey) {
-    console.error("❌ PERPLEXITY_API_KEY não encontrada nos segredos!");
+    console.error("❌ PERPLEXITY_API_KEY não encontrada!");
     return null;
   }
 
@@ -78,18 +77,18 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
       messages: [
         {
           role: "system",
-          content: "Você é um assistente de pesquisa especializado. Forneça informações precisas, atualizadas e específicas sobre o tópico solicitado. Inclua dados, números, datas e fontes quando possível."
+          content: "Você é um assistente de pesquisa. Forneça informações precisas e atualizadas sobre o tópico solicitado. Seja conciso mas informativo."
         },
         {
           role: "user", 
           content: query
         }
       ],
-      max_tokens: 1500,
-      temperature: 0.1,
+      max_tokens: 1000,
+      temperature: 0.2,
     };
     
-    console.log("📤 Enviando para Perplexity:", JSON.stringify(requestBody, null, 2));
+    console.log("📤 Enviando requisição...");
 
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -100,37 +99,68 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
       body: JSON.stringify(requestBody),
     });
 
-    console.log(`📥 Status da resposta: ${response.status} ${response.statusText}`);
+    console.log(`📥 Status: ${response.status}`);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ Erro HTTP ${response.status}:`, errorText);
+      console.error(`❌ Erro ${response.status}:`, errorText);
       return null;
     }
 
     const data = await response.json();
-    console.log("📊 Resposta completa da Perplexity:", JSON.stringify(data, null, 2));
-    
     const result = data.choices?.[0]?.message?.content;
     
     if (result) {
       console.log("✅ BUSCA REALIZADA COM SUCESSO!");
-      console.log(`📄 Conteúdo obtido (${result.length} caracteres):`, result.substring(0, 200) + "...");
+      console.log(`📄 Conteúdo: ${result.substring(0, 100)}...`);
       return result;
     } else {
-      console.error("❌ Resposta sem conteúdo válido");
+      console.error("❌ Resposta sem conteúdo");
       return null;
     }
     
   } catch (error) {
-    console.error("💥 ERRO CRÍTICO na busca Perplexity:", error);
-    console.error("Stack trace:", error.stack);
+    console.error("💥 ERRO na busca:", error.message);
     return null;
   }
 }
 
+async function callAnthropic(messages: any[], systemPrompt: string): Promise<string> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  
+  if (!apiKey) {
+    throw new Error("Chave da Anthropic não encontrada");
+  }
+
+  console.log("🧠 Chamando Anthropic...");
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ Erro Anthropic ${response.status}:`, errorText);
+    throw new Error(`Erro na API: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.content[0].text;
+}
+
 serve(async (req) => {
-  console.log("🚀 === FUNÇÃO INDIVIDUAL-CHAT INICIADA ===");
+  console.log("🚀 === FUNÇÃO INICIADA ===");
   
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -139,8 +169,9 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const { messages, agentName } = body;
+    
     console.log(`👤 Agente: ${agentName}`);
-    console.log(`💬 Número de mensagens: ${messages?.length || 0}`);
+    console.log(`💬 Mensagens: ${messages?.length || 0}`);
 
     if (!agentName || !messages) {
       return new Response(JSON.stringify({ 
@@ -161,118 +192,47 @@ serve(async (req) => {
       });
     }
 
-    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!anthropicKey) {
-      return new Response(JSON.stringify({ 
-        content: `Olá! Eu sou ${agentName}. No momento, estou com problemas de configuração da API. Por favor, tente novamente em alguns minutos.`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
-
     const lastUserMessage = messages[messages.length - 1];
     const userQuery = lastUserMessage?.content || "";
     
-    console.log(`🔍 === ANALISANDO NECESSIDADE DE BUSCA ===`);
-    console.log(`📝 Mensagem do usuário: "${userQuery}"`);
+    console.log(`🔍 Analisando: "${userQuery}"`);
 
-    // ETAPA 1: Análise mais agressiva para busca
-    let searchContext = null;
+    // ETAPA 1: Decidir se precisa buscar
+    let needsSearch = false;
+    const searchKeywords = ['atual', 'hoje', 'recente', 'último', 'novo', '2024', '2025', 'agora', 'iPhone', 'Apple', 'Amazon', 'Google', 'Meta', 'Tesla', 'mercado', 'tendência'];
     
-    try {
-      const anthropic = new Anthropic({ apiKey: anthropicKey });
-      
-      // Classificador mais sensível
-      const gatekeeperResponse = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 200,
-        system: `Você é um classificador que decide se uma pergunta precisa de informações atualizadas da internet.
-
-SEMPRE BUSQUE se a pergunta contém:
-- Nomes de empresas, produtos, pessoas famosas, marcas
-- Palavras como: "atual", "hoje", "recente", "último", "novo", "2024", "2025", "agora"
-- Perguntas sobre mercado, tendências, notícias, dados, estatísticas
-- Qualquer referência a eventos ou desenvolvimentos específicos
-- Comparações entre produtos ou empresas
-
-SEJA MUITO LIBERAL - na dúvida, SEMPRE busque.
-
-Responda APENAS com JSON válido:
-{"search_needed": boolean, "query": "string"}
-
-Se search_needed for true, crie uma query específica em inglês para buscar informações atualizadas.`,
-        messages: [{
-          role: "user",
-          content: `Analise esta mensagem: "${userQuery}"`
-        }],
-      });
-
-      const gatekeeperText = gatekeeperResponse.content[0].text;
-      console.log(`🤖 Resposta do classificador: ${gatekeeperText}`);
-      
-      let gatekeeperJson;
-      try {
-        gatekeeperJson = JSON.parse(gatekeeperText);
-      } catch (parseError) {
-        console.error("❌ Erro ao parsear JSON do classificador:", parseError);
-        // Fallback: sempre buscar se houver dúvida
-        gatekeeperJson = { search_needed: true, query: userQuery };
+    for (const keyword of searchKeywords) {
+      if (userQuery.toLowerCase().includes(keyword.toLowerCase())) {
+        needsSearch = true;
+        break;
       }
-      
-      if (gatekeeperJson.search_needed && gatekeeperJson.query) {
-        console.log(`🔍 === INICIANDO BUSCA ===`);
-        console.log(`🎯 Query de busca: "${gatekeeperJson.query}"`);
-        
-        searchContext = await searchWithPerplexity(gatekeeperJson.query);
-        
-        if (searchContext) {
-          console.log(`✅ BUSCA CONCLUÍDA - Dados obtidos!`);
-        } else {
-          console.log(`❌ BUSCA FALHOU - Usando conhecimento interno`);
-        }
-      } else {
-        console.log(`⚡ Classificador decidiu NÃO buscar`);
-      }
-    } catch (e) {
-      console.error(`❌ Erro no classificador:`, e);
     }
 
-    // ETAPA 2: Gerar resposta
-    try {
-      const anthropic = new Anthropic({ apiKey: anthropicKey });
-      
-      let finalSystemPrompt = systemPrompt;
-      let finalMessages = [...messages];
-      
-      if (searchContext) {
-        console.log(`📊 === INCORPORANDO DADOS DA INTERNET ===`);
-        console.log(`📄 Tamanho do contexto: ${searchContext.length} caracteres`);
-        
-        finalSystemPrompt = `${systemPrompt}
+    console.log(`🎯 Precisa buscar: ${needsSearch ? 'SIM' : 'NÃO'}`);
+
+    // ETAPA 2: Buscar se necessário
+    let searchContext = null;
+    if (needsSearch) {
+      console.log("🔍 Iniciando busca...");
+      searchContext = await searchWithPerplexity(userQuery);
+    }
+
+    // ETAPA 3: Gerar resposta
+    let finalSystemPrompt = systemPrompt;
+    
+    if (searchContext) {
+      console.log("📊 Incorporando dados da web");
+      finalSystemPrompt = `${systemPrompt}
 
 === INFORMAÇÕES ATUALIZADAS DA INTERNET ===
 ${searchContext}
 
-INSTRUÇÕES IMPORTANTES:
-- Use essas informações atualizadas para enriquecer sua resposta
-- Integre os dados de forma natural na sua personalidade
-- NÃO mencione que fez uma busca na internet
-- Cite números, dados e fatos específicos quando relevante
-- Mantenha sua personalidade autêntica`;
-      }
+INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente.`;
+    }
 
-      console.log(`🧠 Gerando resposta final...`);
-      
-      const response = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 1024,
-        system: finalSystemPrompt,
-        messages: finalMessages,
-      });
-
-      const assistantResponse = response.content[0].text;
-      console.log("✅ === RESPOSTA GERADA COM SUCESSO ===");
+    try {
+      const assistantResponse = await callAnthropic(messages, finalSystemPrompt);
+      console.log("✅ Resposta gerada!");
 
       return new Response(JSON.stringify({ 
         content: assistantResponse 
@@ -282,10 +242,10 @@ INSTRUÇÕES IMPORTANTES:
       });
 
     } catch (anthropicError) {
-      console.error("💥 Erro na API da Anthropic:", anthropicError);
+      console.error("💥 Erro Anthropic:", anthropicError.message);
       
       return new Response(JSON.stringify({ 
-        content: `Olá! Eu sou ${agentName}. No momento, estou com dificuldades técnicas para processar sua mensagem. Tente novamente em alguns minutos, por favor.`
+        content: `Olá! Eu sou ${agentName}. No momento, estou com dificuldades técnicas. Tente novamente em alguns minutos.`
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -293,10 +253,10 @@ INSTRUÇÕES IMPORTANTES:
     }
 
   } catch (error) {
-    console.error("💥 ERRO GERAL:", error);
+    console.error("💥 ERRO GERAL:", error.message);
     
     return new Response(JSON.stringify({ 
-      content: "Desculpe, ocorreu um erro técnico inesperado. Tente novamente em alguns minutos."
+      content: "Desculpe, ocorreu um erro técnico. Tente novamente em alguns minutos."
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
