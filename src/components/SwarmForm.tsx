@@ -41,7 +41,8 @@ const SwarmForm: React.FC<SwarmFormProps> = ({ onSubmit, isLoading }) => {
       try {
         const { data, error } = await supabase
           .from('custom_agents')
-          .select('id, name');
+          .select('id, name')
+          .eq('user_id', session.user.id);
         if (error) throw error;
 
         const custom: AgentOption[] = data.map(c => ({

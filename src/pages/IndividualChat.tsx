@@ -60,6 +60,7 @@ const IndividualChat = () => {
         const { data, error } = await supabase
           .from('custom_agents')
           .select('id, name, title, description, persona, created_at')
+          .eq('user_id', session.user.id)
           .order('created_at', { ascending: false });
         if (error) throw error;
         setCustomAgents(data || []);
