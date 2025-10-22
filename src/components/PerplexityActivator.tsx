@@ -26,19 +26,27 @@ const PerplexityActivator = () => {
     setError(null);
     
     try {
+      console.log("🔍 Verificando status da API...");
+      
       const { data, error } = await supabase.functions.invoke('activate-perplexity', {
         body: { action: 'check_status' }
       });
 
-      if (error) throw error;
+      console.log("📊 Resposta do status:", data);
+      console.log("❌ Erro do status:", error);
 
-      if (data.success) {
+      if (error) {
+        throw new Error(`Erro na função: ${error.message}`);
+      }
+
+      if (data?.success) {
         setStatus(data.status);
         showSuccess('Status da API verificado com sucesso!');
       } else {
-        throw new Error(data.error);
+        throw new Error(data?.error || 'Erro desconhecido ao verificar status');
       }
     } catch (err: any) {
+      console.error("💥 Erro ao verificar status:", err);
       setError(err.message);
       showError(`Erro ao verificar status: ${err.message}`);
     } finally {
@@ -52,22 +60,27 @@ const PerplexityActivator = () => {
     setTestResult(null);
     
     try {
+      console.log("🧪 Testando conexão...");
+      
       const { data, error } = await supabase.functions.invoke('activate-perplexity', {
-        body: { 
-          action: 'test_connection',
-          testQuery: 'What is the latest iPhone model from Apple in 2024? Include iPhone 16 details.'
-        }
+        body: { action: 'test_connection' }
       });
 
-      if (error) throw error;
+      console.log("📊 Resposta do teste:", data);
+      console.log("❌ Erro do teste:", error);
 
-      if (data.success) {
+      if (error) {
+        throw new Error(`Erro na função: ${error.message}`);
+      }
+
+      if (data?.success) {
         setTestResult(data.test_result);
         showSuccess('🎉 Conexão com a internet funcionando! Os clones agora têm acesso a dados atualizados.');
       } else {
-        throw new Error(data.error);
+        throw new Error(data?.error || 'Erro desconhecido no teste de conexão');
       }
     } catch (err: any) {
+      console.error("💥 Erro no teste de conexão:", err);
       setError(err.message);
       showError(`Erro no teste de conexão: ${err.message}`);
     } finally {
@@ -87,7 +100,7 @@ const PerplexityActivator = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Status da API */}
+        {/* Botões de Ação */}
         <div className="flex gap-2">
           <Button 
             onClick={checkStatus} 
