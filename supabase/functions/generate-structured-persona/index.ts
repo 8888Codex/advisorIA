@@ -78,7 +78,7 @@ Sua resposta final deve ser APENAS o prompt reformatado, começando com "# Syste
 `;
 
     const response = await anthropic.messages.create({
-      model: "claude-3-sonnet-20240229",
+      model: "claude-3-haiku-20240307", // Using the proven Haiku model
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
