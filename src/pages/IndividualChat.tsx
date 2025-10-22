@@ -18,6 +18,7 @@ type SelectedAgent = {
   avatar?: string;
   description?: string;
   title?: string;
+  emoji?: string;
   type: 'predefined' | 'custom';
 };
 
@@ -52,7 +53,7 @@ const IndividualChat = () => {
           const foundAgent = availableAgents.find(a => a.id === convData.agent_id);
           if (foundAgent) agentData = { ...foundAgent };
         } else {
-          const { data: customAgentData, error: customAgentError } = await supabase.from('custom_agents').select('id, name, title, description, persona').eq('id', convData.agent_id).single();
+          const { data: customAgentData, error: customAgentError } = await supabase.from('custom_agents').select('id, name, title, description, persona, emoji').eq('id', convData.agent_id).single();
           if (customAgentError || !customAgentData) throw new Error('Clone customizado não encontrado.');
           agentData = { ...customAgentData, avatar: '/placeholder.svg', type: 'custom' };
         }
@@ -80,7 +81,7 @@ const IndividualChat = () => {
       }
       setLoadingCustom(true);
       try {
-        const { data, error } = await supabase.from('custom_agents').select('id, name, title, description, persona, created_at').eq('user_id', session.user.id).order('created_at', { ascending: false });
+        const { data, error } = await supabase.from('custom_agents').select('id, name, title, description, persona, created_at, emoji').eq('user_id', session.user.id).order('created_at', { ascending: false });
         if (error) throw error;
         setCustomAgents(data || []);
       } catch (error) {
@@ -124,7 +125,7 @@ const IndividualChat = () => {
 
   const renderAgentSelection = () => {
     const customAgentsForDisplay = customAgents.map(clone => ({
-      id: clone.id, name: clone.name, avatar: '/placeholder.svg', title: clone.title || 'Clone Customizado', description: clone.description || 'Um especialista de IA criado por você.', tags: ['Customizado'], fidelity: 'Alta' as const, customizable: true, type: 'custom' as const,
+      id: clone.id, name: clone.name, avatar: '/placeholder.svg', title: clone.title || 'Clone Customizado', description: clone.description || 'Um especialista de IA criado por você.', tags: ['Customizado'], fidelity: 'Alta' as const, customizable: true, type: 'custom' as const, emoji: clone.emoji
     }));
     return (
       <div className="w-full max-w-7xl mx-auto p-4 md:p-8">

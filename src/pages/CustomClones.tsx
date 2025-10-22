@@ -17,6 +17,7 @@ const cloneSchema = z.object({
   name: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
   title: z.string().optional(),
   description: z.string().optional(),
+  emoji: z.string().optional(),
   persona: z.string().min(50, { message: 'A persona deve ter pelo menos 50 caracteres para ser eficaz.' }),
 });
 
@@ -25,6 +26,7 @@ export interface CustomAgent {
   name: string;
   title?: string;
   description?: string;
+  emoji?: string;
   persona: string;
   created_at: string;
 }
@@ -39,7 +41,7 @@ const CustomClones = () => {
 
   const form = useForm<z.infer<typeof cloneSchema>>({
     resolver: zodResolver(cloneSchema),
-    defaultValues: { name: '', title: '', description: '', persona: '' },
+    defaultValues: { name: '', title: '', description: '', emoji: '', persona: '' },
   });
 
   const fetchClones = async () => {
@@ -72,7 +74,6 @@ const CustomClones = () => {
     setIsGeneratingPersona(true);
     const toastId = showLoading('Iniciando geração de persona...');
     try {
-      // Step 1: Generate the base persona
       toast.loading('Passo 1/2: Pesquisando e gerando a persona base...', { id: toastId });
       const { data: personaData, error: personaError } = await supabase.functions.invoke('generate-persona', {
         body: { name },
@@ -84,7 +85,6 @@ const CustomClones = () => {
       }
       if (personaData.error) throw new Error(`Etapa 1 falhou: ${personaData.error}`);
 
-      // Step 2: Refine the persona
       toast.loading('Passo 2/2: Refinando a estrutura da persona...', { id: toastId });
       const { data: refinedData, error: refinedError } = await supabase.functions.invoke('refine-persona', {
         body: { personaText: personaData.persona, agentName: name },
@@ -113,6 +113,7 @@ const CustomClones = () => {
       name: clone.name,
       title: clone.title || '',
       description: clone.description || '',
+      emoji: clone.emoji || '',
       persona: clone.persona,
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -120,7 +121,7 @@ const CustomClones = () => {
 
   const cancelEdit = () => {
     setEditingClone(null);
-    form.reset({ name: '', title: '', description: '', persona: '' });
+    form.reset({ name: '', title: '', description: '', emoji: '', persona: '' });
   };
 
   const onSubmit = async (values: z.infer<typeof cloneSchema>) => {
@@ -172,8 +173,16 @@ const CustomClones = () => {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormItem className="sm:col-span-2"><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="emoji" render={({ field }) => (
+                    <FormItem><FormLabel>Emoji</FormLabel><FormControl><Input placeholder="💡" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
                 <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription><FormMessage /></FormItem>
+                  <FormItem><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription></FormItem>
                 )} />
                 <FormField control={form.control} name="title" render={({ field }) => (
                   <FormItem><FormLabel>Cargo / Título</FormLabel><FormControl><Input placeholder="Ex: Co-fundador da Apple" {...field} /></FormControl><FormMessage /></FormItem>
@@ -219,9 +228,12 @@ const CustomClones = () => {
               <div className="space-y-4">
                 {clones.map(clone => (
                   <div key={clone.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-semibold">{clone.name}</p>
-                      <p className="text-sm text-muted-foreground">{clone.title || 'Sem título'}</p>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{clone.emoji || '🤖'}</span>
+                      <div>
+                        <p className="font-semibold">{clone.name}</p>
+                        <p className="text-sm text-muted-foreground">{clone.title || 'Sem título'}</p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => handleEdit(clone)}><Pencil className="h-4 w-4" /></Button>

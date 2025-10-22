@@ -14,6 +14,7 @@ interface AgentOption {
   id: string;
   name: string;
   avatar: string;
+  emoji?: string;
   type: 'predefined' | 'custom';
 }
 
@@ -41,7 +42,7 @@ const SwarmForm: React.FC<SwarmFormProps> = ({ onSubmit, isLoading }) => {
       try {
         const { data, error } = await supabase
           .from('custom_agents')
-          .select('id, name')
+          .select('id, name, emoji')
           .eq('user_id', session.user.id);
         if (error) throw error;
 
@@ -49,6 +50,7 @@ const SwarmForm: React.FC<SwarmFormProps> = ({ onSubmit, isLoading }) => {
           id: c.id,
           name: c.name,
           avatar: '/placeholder.svg',
+          emoji: c.emoji,
           type: 'custom'
         }));
         setAllAgents([...predefined, ...custom]);
@@ -109,7 +111,9 @@ const SwarmForm: React.FC<SwarmFormProps> = ({ onSubmit, isLoading }) => {
                   />
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={agent.avatar} alt={agent.name} />
-                    <AvatarFallback>{agent.name.substring(0, 2)}</AvatarFallback>
+                    <AvatarFallback className="bg-transparent text-lg">
+                      {agent.type === 'custom' && agent.emoji ? agent.emoji : agent.name.substring(0, 2)}
+                    </AvatarFallback>
                   </Avatar>
                   <Label htmlFor={agent.id} className="font-normal cursor-pointer flex items-center gap-2">
                     {agent.name}

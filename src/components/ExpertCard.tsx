@@ -7,7 +7,7 @@ import { Agent } from "@/lib/agents";
 import { CheckCircle, MessageSquare, Sparkles } from "lucide-react";
 
 interface ExpertCardProps {
-  agent: Agent;
+  agent: Agent & { emoji?: string };
   onSelect: (agentName: string) => void;
 }
 
@@ -17,7 +17,9 @@ export const ExpertCard: React.FC<ExpertCardProps> = ({ agent, onSelect }) => {
       <CardHeader className="items-center pt-6">
         <Avatar className="w-20 h-20 border-2 border-primary/20">
           <AvatarImage src={agent.avatar} alt={agent.name} />
-          <AvatarFallback className="text-2xl">{agent.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+          <AvatarFallback className="text-4xl bg-transparent">
+            {agent.emoji ? agent.emoji : agent.name.split(' ').map(n => n[0]).join('')}
+          </AvatarFallback>
         </Avatar>
       </CardHeader>
       <CardContent className="flex-1 text-center space-y-4 px-4">
