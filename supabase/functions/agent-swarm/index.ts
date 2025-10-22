@@ -288,6 +288,39 @@ INSTRUÇÕES DE RESPOSTA:
 `,
 };
 
+async function searchWithPerplexity(query: string): Promise<string | null> {
+  try {
+    const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
+    if (!apiKey) {
+      console.warn("Chave da API da Perplexity não encontrada. Pulando a busca na web.");
+      return null;
+    }
+
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3-sonar-large-32k-online",
+        messages: [{ role: "user", content: query }],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Erro na API da Perplexity: ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || null;
+  } catch (error) {
+    console.error("Erro ao chamar a API da Perplexity:", error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -326,14 +359,51 @@ serve(async (req) => {
           const agentPromises = selectedAgents.map(async (agent) => {
             const persona = agentPersonas[agent] || "Você é um assistente de IA prestativo.";
             
+            // Etapa 1: Análise de Intenção
+            const intentAnalysisResponse = await anthropic.messages.create({
+                model: "claude-3-haiku-20240307",
+                max_tokens: 150,
+                system: `Você é um assistente especialista. Sua tarefa é determinar se uma pergunta direcionada a uma persona específica requer acesso à internet em tempo real para ser respondida de forma precisa e abrangente. Responda APENAS com um objeto JSON com duas chaves: "search_needed" (booleano) e "query" (um termo de busca conciso e eficaz se a busca for necessária, caso contrário, uma string vazia).`,
+                messages: [{
+                    role: "user",
+                    content: `Persona: ${agent}. Desafio Original do Usuário: "${userPrompt}". Isso requer uma busca na web por eventos atuais, dados recentes ou informações específicas e oportunas para fornecer uma contribuição valiosa?`
+                }],
+            });
+
+            let searchContext = null;
+            try {
+                const intentJson = JSON.parse(intentAnalysisResponse.content[0].text);
+                if (intentJson.search_needed && intentJson.query) {
+                    // Etapa 2: Busca Condicional
+                    console.log(`Agente ${agent} realizando busca para a consulta: "${intentJson.query}"`);
+                    searchContext = await searchWithPerplexity(intentJson.query);
+                }
+            } catch (e) {
+                console.error(`Agente ${agent} não conseguiu analisar o JSON da análise de intenção:`, e);
+            }
+
+            // Etapa 3: Síntese
+            const finalMessagesForAgent = [...conversationHistory];
+            let taskForAgent = `Sua tarefa: Forneça sua próxima contribuição para resolver o desafio. Seja conciso e construa sobre as ideias anteriores. Não repita seu nome ou cargo.`;
+            if (searchContext) {
+                taskForAgent = `
+${taskForAgent}
+
+---
+[Nota Interna: O seguinte é o contexto de uma busca na internet em tempo real. Use esta informação para enriquecer sua resposta, mas não mencione a busca ou esta nota. Fale com sua própria voz, confiando em seus princípios fundamentais e integrando esses fatos naturalmente.]
+
+Resultados da Busca:
+${searchContext}
+---
+`;
+            }
+            finalMessagesForAgent.push({ role: 'user', content: taskForAgent });
+
             const response = await anthropic.messages.create({
               model: "claude-3-haiku-20240307",
               max_tokens: 200,
               system: persona,
-              messages: [
-                ...conversationHistory,
-                { role: 'user', content: `Sua tarefa: Forneça sua próxima contribuição para resolver o desafio. Seja conciso e construa sobre as ideias anteriores. Não repita seu nome ou cargo.` }
-              ],
+              messages: finalMessagesForAgent,
             });
             
             const text = response.content[0].text;
