@@ -21,6 +21,7 @@ import { useSession } from "@/contexts/SessionContext";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { ThemeToggle } from "./theme-toggle";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -121,6 +122,7 @@ export function Header() {
         <div className="ml-auto flex-1 sm:flex-initial">
           {/* Espaço para busca no futuro */}
         </div>
+        <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
