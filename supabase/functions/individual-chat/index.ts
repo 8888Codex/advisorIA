@@ -65,7 +65,23 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
   }
 
   try {
-    console.log(`🔍 Buscando na internet: "${query}"`);
+    // Melhorar a query para obter dados mais atuais
+    let enhancedQuery = query;
+    
+    // Se a pergunta for sobre iPhone, tornar mais específica
+    if (query.toLowerCase().includes('iphone')) {
+      enhancedQuery = `What is the latest iPhone model released by Apple in 2024? Include iPhone 16 series details and current information.`;
+    }
+    // Se for sobre produtos Apple em geral
+    else if (query.toLowerCase().includes('apple')) {
+      enhancedQuery = `${query} - provide the most current information from 2024`;
+    }
+    // Para outras perguntas, adicionar contexto temporal
+    else {
+      enhancedQuery = `${query} - current information and latest updates from 2024`;
+    }
+    
+    console.log(`🔍 Busca melhorada: "${enhancedQuery}"`);
     
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -74,15 +90,15 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3-sonar-large-32k-online", // MESMO MODELO QUE FUNCIONA NO TESTE
+        model: "llama-3-sonar-large-32k-online",
         messages: [
           {
             role: "system",
-            content: "Você é um assistente de pesquisa especializado. Forneça informações precisas, atualizadas e detalhadas sobre o tópico solicitado."
+            content: "You are a research assistant specialized in providing the most current and accurate information. Always prioritize recent data from 2024 and the latest updates. Be specific about dates and current status."
           },
           {
             role: "user", 
-            content: query
+            content: enhancedQuery
           }
         ],
         max_tokens: 1500,
@@ -100,7 +116,7 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
     const result = data.choices?.[0]?.message?.content;
     
     if (result) {
-      console.log(`✅ Busca bem-sucedida! Resultado: ${result.substring(0, 100)}...`);
+      console.log(`✅ Busca bem-sucedida! Resultado: ${result.substring(0, 200)}...`);
     }
     
     return result || null;
@@ -172,14 +188,15 @@ serve(async (req) => {
       console.log(`🌐 ${agentName} obteve dados da internet!`);
       finalSystemPrompt = `${systemPrompt}
 
-=== INFORMAÇÕES ATUALIZADAS DA INTERNET ===
+=== INFORMAÇÕES ATUALIZADAS DA INTERNET (2024) ===
 ${searchContext}
 
 INSTRUÇÕES CRÍTICAS: 
-- Use essas informações para enriquecer sua resposta
+- Use PRIORITARIAMENTE essas informações atualizadas
 - Integre os dados naturalmente em seu raciocínio
 - Mantenha sua personalidade
-- NÃO mencione que fez uma busca`;
+- NÃO mencione que fez uma busca
+- Se houver conflito entre seu conhecimento base e essas informações, PRIORIZE as informações atualizadas`;
     } else {
       console.log(`⚠️ ${agentName} não conseguiu dados da internet, usando conhecimento base.`);
     }

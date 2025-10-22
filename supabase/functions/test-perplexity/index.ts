@@ -6,36 +6,78 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Log para confirmar a versão da função
-  console.log("--- DEPLOYMENT CHECK: VERSION 6 (Bypass Test) ---");
-  console.log("--- Esta versão ignora completamente a API da Perplexity. ---");
+  console.log("🚀 TESTE PERPLEXITY - Versão com Query Específica");
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
   
   try {
-    // Esta função agora ignora a chamada à API da Perplexity para testar se os deploys estão funcionando.
-    // Ela sempre retornará uma mensagem de sucesso.
+    const body = await req.json();
+    const { query } = body;
     
-    const successMessage = "Teste de bypass bem-sucedido! O deploy da função está funcionando. Agora podemos reativar a API.";
+    const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
+    if (!apiKey) {
+      throw new Error("PERPLEXITY_API_KEY não encontrada nos segredos do Supabase");
+    }
 
-    console.log("[V6] Teste de bypass bem-sucedido. Retornando mensagem fixa.");
+    // Query mais específica para obter dados atuais
+    const searchQuery = query || "What is the newest iPhone model released by Apple in 2024? Include the iPhone 16 series details.";
+    console.log(`🔍 Fazendo busca específica: "${searchQuery}"`);
+
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3-sonar-large-32k-online",
+        messages: [
+          {
+            role: "system",
+            content: "You are a research assistant. Provide the most current and accurate information available. Focus on recent releases and current data from 2024."
+          },
+          {
+            role: "user", 
+            content: searchQuery
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Erro HTTP ${response.status}:`, errorText);
+      throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const result = data.choices?.[0]?.message?.content;
+    
+    if (!result) {
+      throw new Error("Resposta vazia da API da Perplexity");
+    }
+
+    console.log("✅ Busca na Perplexity bem-sucedida!");
+    console.log(`📄 Resultado: ${result}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      result: successMessage 
+      result: result,
+      query_used: searchQuery
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
       status: 200
     });
 
   } catch (error) {
-    // Este bloco de erro não deve ser alcançado nesta versão.
-    console.error(`[V6] Ocorreu um erro crítico, o que é inesperado no modo de bypass: ${error.message}`);
+    console.error(`💥 ERRO:`, error.message);
     return new Response(JSON.stringify({ 
       success: false, 
-      error: `Erro Crítico no Modo Bypass: ${error.message}`
+      error: error.message
     }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
       status: 500 
