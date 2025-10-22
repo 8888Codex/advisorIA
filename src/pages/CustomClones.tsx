@@ -74,24 +74,26 @@ const CustomClones = () => {
     setIsGeneratingPersona(true);
     const toastId = showLoading('Iniciando geração de persona...');
     try {
+      // Step 1: Generate the base persona
       toast.loading('Passo 1/2: Pesquisando e gerando a persona base...', { id: toastId });
       const { data: personaData, error: personaError } = await supabase.functions.invoke('generate-persona', {
         body: { name },
       });
 
       if (personaError) {
-        const errorMessage = personaError.context?.error?.message || personaError.message;
+        const errorMessage = personaError.context?.error || personaError.message;
         throw new Error(`Etapa 1 falhou: ${errorMessage}`);
       }
       if (personaData.error) throw new Error(`Etapa 1 falhou: ${personaData.error}`);
 
+      // Step 2: Refine the persona
       toast.loading('Passo 2/2: Refinando a estrutura da persona...', { id: toastId });
       const { data: refinedData, error: refinedError } = await supabase.functions.invoke('refine-persona', {
         body: { personaText: personaData.persona, agentName: name },
       });
 
       if (refinedError) {
-        const errorMessage = refinedError.context?.error?.message || refinedError.message;
+        const errorMessage = refinedError.context?.error || refinedError.message;
         throw new Error(`Etapa 2 falhou: ${errorMessage}`);
       }
       if (refinedData.error) throw new Error(`Etapa 2 falhou: ${refinedData.error}`);
