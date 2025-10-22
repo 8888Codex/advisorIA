@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles } from 'lucide-react';
+import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles, Pencil } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -34,6 +34,7 @@ const CustomClones = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPersona, setIsGeneratingPersona] = useState(false);
+  const [editingClone, setEditingClone] = useState<CustomAgent | null>(null);
 
   const form = useForm<z.infer<typeof cloneSchema>>({
     resolver: zodResolver(cloneSchema),
@@ -74,8 +75,6 @@ const CustomClones = () => {
       });
 
       if (error) throw error;
-      
-      // The Edge Function itself might return an error in its body if the API call fails
       if (data.error) throw new Error(data.error);
 
       form.setValue('persona', data.persona, { shouldValidate: true });
@@ -89,16 +88,39 @@ const CustomClones = () => {
     }
   };
 
+  const handleEdit = (clone: CustomAgent) => {
+    setEditingClone(clone);
+    form.reset({
+      name: clone.name,
+      title: clone.title || '',
+      description: clone.description || '',
+      persona: clone.persona,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingClone(null);
+    form.reset({ name: '', title: '', description: '', persona: '' });
+  };
+
   const onSubmit = async (values: z.infer<typeof cloneSchema>) => {
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('custom_agents').insert(values);
-      if (error) throw error;
-      showSuccess('Clone criado com sucesso!');
+      if (editingClone) {
+        const { error } = await supabase.from('custom_agents').update(values).eq('id', editingClone.id);
+        if (error) throw error;
+        showSuccess('Clone atualizado com sucesso!');
+        setEditingClone(null);
+      } else {
+        const { error } = await supabase.from('custom_agents').insert(values);
+        if (error) throw error;
+        showSuccess('Clone criado com sucesso!');
+      }
       form.reset();
       fetchClones();
     } catch (error) {
-      showError('Falha ao criar o clone.');
+      showError(editingClone ? 'Falha ao atualizar o clone.' : 'Falha ao criar o clone.');
     } finally {
       setIsSubmitting(false);
     }
@@ -120,8 +142,13 @@ const CustomClones = () => {
       <div className="lg:col-span-1">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5" /> Criar Novo Clone</CardTitle>
-            <CardDescription>Defina a personalidade e o conhecimento do seu especialista de IA.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              {editingClone ? <Pencil className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
+              {editingClone ? `Editando "${editingClone.name}"` : 'Criar Novo Clone'}
+            </CardTitle>
+            <CardDescription>
+              {editingClone ? 'Ajuste os detalhes do seu clone abaixo.' : 'Defina a personalidade e o conhecimento do seu especialista de IA.'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -148,10 +175,13 @@ const CustomClones = () => {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isSubmitting ? 'Criando...' : 'Criar Clone'}
-                </Button>
+                <div className="flex gap-2">
+                  {editingClone && <Button type="button" variant="outline" className="w-full" onClick={cancelEdit}>Cancelar</Button>}
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isSubmitting ? (editingClone ? 'Atualizando...' : 'Criando...') : (editingClone ? 'Atualizar Clone' : 'Criar Clone')}
+                  </Button>
+                </div>
               </form>
             </Form>
           </CardContent>
@@ -174,13 +204,16 @@ const CustomClones = () => {
                       <p className="font-semibold">{clone.name}</p>
                       <p className="text-sm text-muted-foreground">{clone.title || 'Sem título'}</p>
                     </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader><AlertDialogTitle>Excluir "{clone.name}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O clone será removido permanentemente.</AlertDialogDescription></AlertDialogHeader>
-                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteClone(clone.id)}>Excluir</AlertDialogAction></AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => handleEdit(clone)}><Pencil className="h-4 w-4" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Excluir "{clone.name}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O clone será removido permanentemente.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteClone(clone.id)}>Excluir</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 ))}
               </div>
