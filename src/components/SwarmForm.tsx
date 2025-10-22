@@ -42,14 +42,14 @@ const SwarmForm: React.FC<SwarmFormProps> = ({ onSubmit, isLoading }) => {
       try {
         const { data, error } = await supabase
           .from('custom_agents')
-          .select('id, name, emoji')
+          .select('id, name, emoji, avatar_url')
           .eq('user_id', session.user.id);
         if (error) throw error;
 
         const custom: AgentOption[] = data.map(c => ({
           id: c.id,
           name: c.name,
-          avatar: '/placeholder.svg',
+          avatar: c.avatar_url || '/placeholder.svg',
           emoji: c.emoji,
           type: 'custom'
         }));

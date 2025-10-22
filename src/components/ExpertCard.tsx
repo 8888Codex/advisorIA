@@ -8,7 +8,7 @@ import { CheckCircle, MessageSquare, Sparkles } from "lucide-react";
 
 interface ExpertCardProps {
   agent: Agent & { emoji?: string };
-  onSelect: (agentName: string) => void;
+  onSelect: (agent: any) => void;
 }
 
 export const ExpertCard: React.FC<ExpertCardProps> = ({ agent, onSelect }) => {
@@ -47,7 +47,7 @@ export const ExpertCard: React.FC<ExpertCardProps> = ({ agent, onSelect }) => {
         </div>
       </CardContent>
       <CardFooter className="p-4">
-        <Button className="w-full" variant="outline" onClick={() => onSelect(agent.name)}>
+        <Button className="w-full" variant="outline" onClick={() => onSelect(agent)}>
           <MessageSquare className="h-4 w-4 mr-2" />
           Iniciar Chat
         </Button>
