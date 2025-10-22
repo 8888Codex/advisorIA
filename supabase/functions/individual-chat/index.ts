@@ -313,39 +313,6 @@ INSTRUÇÕES DE RESPOSTA:
 `,
 };
 
-async function searchWithPerplexity(query: string): Promise<string | null> {
-  try {
-    const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
-    if (!apiKey) {
-      console.warn("Chave da API da Perplexity não encontrada. Pulando a busca na web.");
-      return null;
-    }
-
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3-sonar-large-32k-online",
-        messages: [{ role: "user", content: query }],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(`Erro na API da Perplexity: ${response.statusText}`);
-      return null;
-    }
-
-    const data = await response.json();
-    return data.choices[0]?.message?.content || null;
-  } catch (error) {
-    console.error("Erro ao chamar a API da Perplexity:", error);
-    return null;
-  }
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -354,104 +321,20 @@ serve(async (req) => {
   try {
     console.log("🚀 Função individual-chat iniciada");
     
-    // Verificar se as chaves de API estão configuradas
-    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!anthropicKey) {
-      console.error("❌ ANTHROPIC_API_KEY não encontrada");
-      throw new Error("Chave da API da Anthropic não configurada");
-    }
-    console.log("✅ Chave da Anthropic encontrada");
-
     const anthropic = new Anthropic({
-      apiKey: anthropicKey,
+      apiKey: Deno.env.get("ANTHROPIC_API_KEY"),
     });
 
     const { messages, agentName } = await req.json();
     console.log(`📝 Dados recebidos - Agent: ${agentName}, Messages: ${messages?.length || 0}`);
 
     if (!agentName || !messages) {
-      console.error("❌ Dados inválidos:", { agentName, messagesLength: messages?.length });
       throw new Error("Nome do especialista e mensagens são obrigatórios.");
     }
 
     const systemPrompt = agentPersonas[agentName];
     if (!systemPrompt) {
-      console.error(`❌ Persona não encontrada para: ${agentName}`);
       throw new Error(`Persona para o especialista "${agentName}" não encontrada.`);
-    }
-    console.log(`✅ Persona encontrada para ${agentName}`);
-
-    const userQuestion = messages[messages.length - 1].content;
-    console.log(`💬 Pergunta do usuário: "${userQuestion.substring(0, 100)}..."`);
-
-    // Etapa 1: Porteiro Otimizado - Análise de Classificação Objetiva
-    console.log("🔍 Iniciando análise do porteiro...");
-    const gatekeeperResponse = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307",
-      max_tokens: 100,
-      system: `Você é um classificador de texto especializado. Analise a pergunta do usuário e determine se ela contém:
-      
-      CRITÉRIOS PARA BUSCA (responda true se QUALQUER um for verdadeiro):
-      - Nomes específicos de empresas, produtos, pessoas ou marcas
-      - Palavras temporais como: "hoje", "esta semana", "recente", "último", "atual", "agora", "2024", "2025"
-      - Pedidos explícitos de pesquisa como: "pesquise", "busque", "encontre dados sobre", "analise o mercado"
-      - Referências a eventos, notícias ou dados que mudam com o tempo
-      
-      Responda APENAS com JSON válido: {"search_needed": boolean, "query": "string"}
-      Se search_needed for true, crie uma query de busca concisa e específica.
-      Se search_needed for false, deixe query como string vazia.`,
-      messages: [{
-        role: "user",
-        content: `Pergunta do usuário: "${userQuestion}"`
-      }],
-    });
-
-    let searchContext = null;
-    let searchQuery = "";
-    
-    try {
-      const gatekeeperJson = JSON.parse(gatekeeperResponse.content[0].text);
-      console.log("🤖 Decisão do porteiro:", gatekeeperJson);
-      
-      if (gatekeeperJson.search_needed && gatekeeperJson.query) {
-        searchQuery = gatekeeperJson.query;
-        console.log(`🔍 Porteiro decidiu buscar. Query: "${searchQuery}"`);
-        
-        // Etapa 2: Busca Condicional
-        searchContext = await searchWithPerplexity(searchQuery);
-        
-        if (searchContext) {
-          console.log(`✅ Busca realizada com sucesso. Dados obtidos (${searchContext.length} chars).`);
-        } else {
-          console.log(`❌ Busca falhou ou retornou vazio.`);
-        }
-      } else {
-        console.log(`⚡ Porteiro decidiu NÃO buscar. Resposta rápida.`);
-      }
-    } catch (e) {
-      console.error("❌ Erro ao analisar resposta do porteiro:", e);
-      console.log(`🔄 Fallback: Continuando sem busca.`);
-    }
-
-    // Etapa 3: Síntese e Geração da Resposta Final
-    console.log("🎯 Preparando resposta final...");
-    const finalMessages = [...messages];
-    
-    if (searchContext) {
-      // Injetar contexto da busca na última mensagem
-      const lastMessage = finalMessages.pop();
-      if (lastMessage) {
-        const augmentedContent = `${lastMessage.content}
-
----
-[CONTEXTO INTERNO: Dados recentes da internet sobre "${searchQuery}":
-${searchContext}
-
-INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não mencione que fez uma busca. Integre os dados naturalmente em seu raciocínio e mantenha sua persona.]
----`;
-        finalMessages.push({ ...lastMessage, content: augmentedContent });
-        console.log("📊 Contexto da busca injetado na mensagem");
-      }
     }
 
     console.log("🧠 Gerando resposta com Anthropic...");
@@ -459,11 +342,11 @@ INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não men
       model: "claude-3-haiku-20240307",
       max_tokens: 1024,
       system: systemPrompt,
-      messages: finalMessages,
+      messages: messages,
     });
 
     const assistantResponse = response.content[0].text;
-    console.log(`✅ Resposta gerada com sucesso (${assistantResponse.length} chars)`);
+    console.log(`✅ Resposta gerada com sucesso`);
 
     return new Response(JSON.stringify({ content: assistantResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -472,11 +355,9 @@ INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não men
 
   } catch (error) {
     console.error("💥 Erro na função:", error);
-    console.error("Stack trace:", error.stack);
     
     return new Response(JSON.stringify({ 
-      error: `Erro interno: ${error.message}`,
-      details: error.stack 
+      error: `Erro interno: ${error.message}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
