@@ -8,12 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles, Pencil } from 'lucide-react';
+import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles, Pencil, Upload } from 'lucide-react';
 import { showSuccess, showError, showLoading } from '@/utils/toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Label } from '@/components/ui/label';
 
 const cloneSchema = z.object({
   name: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
@@ -21,6 +23,7 @@ const cloneSchema = z.object({
   description: z.string().optional(),
   emoji: z.string().optional(),
   persona: z.string().min(50, { message: 'A persona deve ter pelo menos 50 caracteres para ser eficaz.' }),
+  avatar_url: z.string().optional(),
 });
 
 export interface CustomAgent {
@@ -29,6 +32,7 @@ export interface CustomAgent {
   title?: string;
   description?: string;
   emoji?: string;
+  avatar_url?: string;
   persona: string;
   created_at: string;
 }
@@ -42,20 +46,18 @@ const CustomClones = () => {
   const [isGeneratingPersona, setIsGeneratingPersona] = useState(false);
   const [editingClone, setEditingClone] = useState<CustomAgent | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<z.infer<typeof cloneSchema>>({
     resolver: zodResolver(cloneSchema),
-    defaultValues: { name: '', title: '', description: '', emoji: '', persona: '' },
+    defaultValues: { name: '', title: '', description: '', emoji: '', persona: '', avatar_url: '' },
   });
 
   const fetchClones = async () => {
     if (!session?.user) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('custom_agents')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('custom_agents').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       setClones(data || []);
     } catch (error) {
@@ -69,6 +71,29 @@ const CustomClones = () => {
     fetchClones();
   }, [session]);
 
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0 || !session?.user) return;
+    
+    const file = event.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${session.user.id}/${Math.random()}.${fileExt}`;
+
+    setIsUploading(true);
+    try {
+      const { error: uploadError } = await supabase.storage.from('clone-avatars').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('clone-avatars').getPublicUrl(filePath);
+      
+      form.setValue('avatar_url', publicUrl);
+      showSuccess('Avatar carregado com sucesso!');
+    } catch (error) {
+      showError('Falha ao carregar o avatar. Verifique se o bucket "clone-avatars" existe e é público.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleGeneratePersona = async () => {
     const name = form.getValues('name');
     if (!name) {
@@ -78,22 +103,15 @@ const CustomClones = () => {
     setIsGeneratingPersona(true);
     const toastId = showLoading('Gerando persona estruturada...');
     try {
-      const { data, error } = await supabase.functions.invoke('generate-structured-persona', {
-        body: { name },
-      });
-
+      const { data, error } = await supabase.functions.invoke('generate-structured-persona', { body: { name } });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
-
       form.setValue('persona', data.persona, { shouldValidate: true });
       toast.success('Persona gerada com sucesso!', { id: toastId });
     } catch (error: any) {
       let detail = "Ocorreu um erro desconhecido.";
-      if (error.context && error.context.error) {
-        detail = error.context.error;
-      } else if (error.message) {
-        detail = error.message;
-      }
+      if (error.context && error.context.error) detail = error.context.error;
+      else if (error.message) detail = error.message;
       toast.error(`Falha ao gerar a persona: ${detail}`, { id: toastId, duration: 10000 });
       console.error("Detailed persona generation error:", error);
     } finally {
@@ -103,17 +121,7 @@ const CustomClones = () => {
 
   const handleOpenDialog = (clone: CustomAgent | null) => {
     setEditingClone(clone);
-    if (clone) {
-      form.reset({
-        name: clone.name,
-        title: clone.title || '',
-        description: clone.description || '',
-        emoji: clone.emoji || '',
-        persona: clone.persona,
-      });
-    } else {
-      form.reset({ name: '', title: '', description: '', emoji: '', persona: '' });
-    }
+    form.reset(clone || { name: '', title: '', description: '', emoji: '', persona: '', avatar_url: '' });
     setIsDialogOpen(true);
   };
 
@@ -130,17 +138,11 @@ const CustomClones = () => {
       } else {
         response = await supabase.from('custom_agents').insert({ ...values, user_id: session.user.id }).select().single();
       }
-
       if (response.error) throw response.error;
       const savedClone = response.data;
-
       toast.success(`Clone "${savedClone.name}" salvo com sucesso!`, {
-        action: {
-          label: "Testar Clone",
-          onClick: () => navigate(`/chat?agentId=${savedClone.id}`),
-        },
+        action: { label: "Testar Clone", onClick: () => navigate(`/chat?agentId=${savedClone.id}`) },
       });
-
       setIsDialogOpen(false);
       fetchClones();
     } catch (error) {
@@ -169,12 +171,7 @@ const CustomClones = () => {
           <p className="text-muted-foreground mt-1">Crie, edite e gerencie seus próprios especialistas de IA.</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog(null)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Criar Novo Clone
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger asChild><Button onClick={() => handleOpenDialog(null)}><PlusCircle className="mr-2 h-4 w-4" />Criar Novo Clone</Button></DialogTrigger>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingClone ? `Editando "${editingClone.name}"` : 'Criar Novo Clone'}</DialogTitle>
@@ -182,91 +179,33 @@ const CustomClones = () => {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
-                      <FormLabel>Nome do Clone</FormLabel>
-                      <FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl>
-                      <FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="emoji" render={({ field }) => (
-                    <FormItem><FormLabel>Emoji</FormLabel><FormControl><Input placeholder="💡" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                </div>
-                <FormField control={form.control} name="title" render={({ field }) => (
-                  <FormItem><FormLabel>Cargo / Título</FormLabel><FormControl><Input placeholder="Ex: Co-fundador da Apple" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="description" render={({ field }) => (
-                  <FormItem><FormLabel>Descrição Curta</FormLabel><FormControl><Textarea placeholder="Descreva o propósito principal deste clone em uma frase." {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="persona" render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Persona / Instruções</FormLabel>
-                      <Button type="button" variant="outline" size="sm" onClick={handleGeneratePersona} disabled={!form.watch('name') || isGeneratingPersona}>
-                        {isGeneratingPersona ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                        Gerar com IA
-                      </Button>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-20 w-20"><AvatarImage src={form.watch('avatar_url') || ''} /><AvatarFallback className="text-3xl">{form.watch('emoji') || '🤖'}</AvatarFallback></Avatar>
+                  <div>
+                    <Label htmlFor="avatar-upload">Foto do Clone</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Button asChild variant="outline" size="sm"><label htmlFor="avatar-upload" className="cursor-pointer"><Upload className="mr-2 h-4 w-4" />{isUploading ? 'Carregando...' : 'Carregar Imagem'}</label></Button>
+                      <Input id="avatar-upload" type="file" className="hidden" onChange={handleAvatarUpload} accept="image/*" disabled={isUploading} />
                     </div>
-                    <FormDescription>Digite um nome acima e clique em "Gerar com IA" para criar uma persona automaticamente, ou escreva a sua própria.</FormDescription>
-                    <FormControl><Textarea placeholder="Descreva o tom de voz, a área de conhecimento, o estilo de resposta e as regras que este clone deve seguir..." rows={10} {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {editingClone ? 'Salvar Alterações' : 'Criar Clone'}
-                  </Button>
+                  </div>
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="name" render={({ field }) => (<FormItem className="sm:col-span-2"><FormLabel>Nome do Clone</FormLabel><FormControl><Input placeholder="Ex: Steve Jobs" {...field} /></FormControl><FormDescription>Insira o nome de uma figura pública para gerar a persona.</FormDescription><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="emoji" render={({ field }) => (<FormItem><FormLabel>Emoji (Fallback)</FormLabel><FormControl><Input placeholder="💡" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                </div>
+                <FormField control={form.control} name="title" render={({ field }) => (<FormItem><FormLabel>Cargo / Título</FormLabel><FormControl><Input placeholder="Ex: Co-fundador da Apple" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descrição Curta</FormLabel><FormControl><Textarea placeholder="Descreva o propósito principal deste clone em uma frase." {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="persona" render={({ field }) => (<FormItem><div className="flex items-center justify-between"><FormLabel>Persona / Instruções</FormLabel><Button type="button" variant="outline" size="sm" onClick={handleGeneratePersona} disabled={!form.watch('name') || isGeneratingPersona}>{isGeneratingPersona ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}Gerar com IA</Button></div><FormDescription>Digite um nome acima e clique em "Gerar com IA" para criar uma persona automaticamente, ou escreva a sua própria.</FormDescription><FormControl><Textarea placeholder="Descreva o tom de voz, a área de conhecimento, o estilo de resposta e as regras que este clone deve seguir..." rows={10} {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <div className="flex justify-end gap-2 pt-4"><Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button><Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {editingClone ? 'Salvar Alterações' : 'Criar Clone'}</Button></div>
               </form>
             </Form>
           </DialogContent>
         </Dialog>
       </div>
-
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" /> Sua Lista de Clones</CardTitle>
-          <CardDescription>Gerencie os especialistas que você criou.</CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" /> Sua Lista de Clones</CardTitle><CardDescription>Gerencie os especialistas que você criou.</CardDescription></CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-          ) : clones.length > 0 ? (
-            <div className="space-y-4">
-              {clones.map(clone => (
-                <div key={clone.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <span className="text-3xl">{clone.emoji || '🤖'}</span>
-                    <div>
-                      <p className="font-semibold">{clone.name}</p>
-                      <p className="text-sm text-muted-foreground">{clone.title || 'Sem título'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => handleOpenDialog(clone)}><Pencil className="h-4 w-4" /></Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader><AlertDialogTitle>Excluir "{clone.name}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O clone será removido permanentemente.</AlertDialogDescription></AlertDialogHeader>
-                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteClone(clone.id)}>Excluir</AlertDialogAction></AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
-              <Inbox className="h-12 w-12 mb-4 text-gray-400" />
-              <h3 className="text-lg font-semibold text-foreground">Nenhum clone encontrado</h3>
-              <p>Clique em "Criar Novo Clone" para começar.</p>
-            </div>
-          )}
+          {isLoading ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : clones.length > 0 ? (<div className="space-y-4">{clones.map(clone => (<div key={clone.id} className="flex items-center justify-between p-4 border rounded-lg"><div className="flex items-center gap-4"><Avatar className="h-12 w-12"><AvatarImage src={clone.avatar_url || ''} /><AvatarFallback className="text-2xl">{clone.emoji || '🤖'}</AvatarFallback></Avatar><div><p className="font-semibold">{clone.name}</p><p className="text-sm text-muted-foreground">{clone.title || 'Sem título'}</p></div></div><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => handleOpenDialog(clone)}><Pencil className="h-4 w-4" /></Button><AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir "{clone.name}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O clone será removido permanentemente.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteClone(clone.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div></div>))}</div>) : (<div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg"><Inbox className="h-12 w-12 mb-4 text-gray-400" /><h3 className="text-lg font-semibold text-foreground">Nenhum clone encontrado</h3><p>Clique em "Criar Novo Clone" para começar.</p></div>)}
         </CardContent>
       </Card>
     </div>
