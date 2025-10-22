@@ -463,7 +463,7 @@ INSTRUÇÕES: Use essas informações para enriquecer sua resposta, mas não men
   } catch (error) {
     console.error(error);
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...cors Headers, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
   }
