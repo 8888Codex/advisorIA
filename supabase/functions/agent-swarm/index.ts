@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import OpenAI from "https://esm.sh/openai@4.20.1";
+import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,8 +21,8 @@ serve(async (req) => {
   }
 
   try {
-    const openai = new OpenAI({
-      apiKey: Deno.env.get("OPENAI_API_KEY"),
+    const anthropic = new Anthropic({
+      apiKey: Deno.env.get("ANTHROPIC_API_KEY"),
     });
 
     const url = new URL(req.url);
@@ -30,8 +30,8 @@ serve(async (req) => {
     const agentsParam = url.searchParams.get('agents');
     const mode = url.searchParams.get('mode');
 
-    if (!Deno.env.get("OPENAI_API_KEY")) {
-      throw new Error("A chave da API da OpenAI não foi configurada nos segredos do Supabase.");
+    if (!Deno.env.get("ANTHROPIC_API_KEY")) {
+      throw new Error("A chave da API da Anthropic não foi configurada nos segredos do Supabase.");
     }
 
     if (!userPrompt || !agentsParam) {
@@ -43,39 +43,37 @@ serve(async (req) => {
 
     const selectedAgents = agentsParam.split(',');
     const numRounds = mode === 'deep' ? 5 : 3;
-    let conversationHistory = `Desafio do Usuário: "${userPrompt}"\n\n`;
+    let conversationHistory: Anthropic.MessageParam[] = [{ role: 'user', content: `Desafio do Usuário: "${userPrompt}"` }];
 
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
 
         for (let i = 1; i <= numRounds; i++) {
-          conversationHistory += `--- ROUND ${i} ---\n`;
-
-          const agentPromises = selectedAgents.map(agent => {
+          const agentPromises = selectedAgents.map(async (agent) => {
             const persona = agentPersonas[agent] || "Você é um assistente de IA prestativo.";
             
-            const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-              { role: 'system', content: persona },
-              { role: 'user', content: `Contexto da discussão até agora:\n${conversationHistory}\n\nSua tarefa: Forneça sua próxima contribuição para resolver o desafio. Seja conciso e construa sobre as ideias anteriores. Não repita seu nome ou cargo.` }
-            ];
-
-            return openai.chat.completions.create({
-              model: "gpt-4o-mini",
-              messages: messages,
-              temperature: 0.7,
-              max_tokens: 150,
-            }).then(response => ({
-              agent,
-              text: response.choices[0].message.content?.trim() || "Não foi possível gerar uma resposta.",
-            }));
+            const response = await anthropic.messages.create({
+              model: "claude-3-haiku-20240307",
+              max_tokens: 200,
+              system: persona,
+              messages: [
+                ...conversationHistory,
+                { role: 'user', content: `Sua tarefa: Forneça sua próxima contribuição para resolver o desafio. Seja conciso e construa sobre as ideias anteriores. Não repita seu nome ou cargo.` }
+              ],
+            });
+            
+            const text = response.content[0].text;
+            return { agent, text };
           });
 
           const contributions = await Promise.all(agentPromises);
-
-          contributions.forEach(c => {
-            conversationHistory += `${c.agent}: ${c.text}\n`;
-          });
+          
+          const assistantMessages: Anthropic.MessageParam[] = contributions.map(c => ({
+            role: 'assistant',
+            content: `[Contribuição de ${c.agent}]: ${c.text}`
+          }));
+          conversationHistory.push(...assistantMessages);
 
           const roundData = {
             round: i,

@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { availableAgents } from '@/lib/agents';
 import { SendHorizonal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSession } from '@/contexts/SessionContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -20,6 +21,7 @@ const IndividualChat = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { supabase } = useSession();
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -40,24 +42,42 @@ const IndividualChat = () => {
     ]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !selectedAgent) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    
+    setMessages(newMessages);
     setInput('');
     setIsLoading(true);
 
-    // Placeholder for backend call
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.functions.invoke('individual-chat', {
+        body: { messages: newMessages, agentName: selectedAgent },
+      });
+
+      if (error) {
+        throw error;
+      }
+
       const assistantResponse: Message = {
         role: 'assistant',
-        content: `Esta é uma resposta simulada de ${selectedAgent}. A lógica real será implementada em breve.`,
+        content: data.content,
       };
       setMessages(prev => [...prev, assistantResponse]);
+
+    } catch (error: any) {
+      console.error("Erro ao chamar a Edge Function:", error);
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `Desculpe, ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.`,
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const currentAgent = availableAgents.find(agent => agent.name === selectedAgent);
