@@ -303,7 +303,7 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3-sonar-large-32k-online",
+        model: "llama-3-sonar-small-32k-online", // NOVO MODELO VÁLIDO
         messages: [{ role: "user", content: query }],
       }),
     });

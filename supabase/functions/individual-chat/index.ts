@@ -66,7 +66,7 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
 
   try {
     const requestBody = {
-      model: "llama-3-sonar-large-32k-online", // MODELO CORRIGIDO
+      model: "llama-3-sonar-small-32k-online", // NOVO MODELO VÁLIDO
       messages: [
         {
           role: "system",
