@@ -190,7 +190,7 @@ const CustomClones = () => {
                     <Label htmlFor="avatar-upload">Foto do Clone</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <Button asChild variant="outline" size="sm"><label htmlFor="avatar-upload" className="cursor-pointer"><Upload className="mr-2 h-4 w-4" />{isUploading ? 'Carregando...' : 'Carregar Imagem'}</label></Button>
-                      <Input id="avatar-upload" type="file" className="hidden" onChange={handleAvatarUpload} accept="image/*" disabled={isUploading} />
+                      <Input id="avatar-upload" type="file" className="hidden" onChange={handleAvatarUpload} accept="image/png, image/jpeg" disabled={isUploading} />
                     </div>
                   </div>
                 </div>
