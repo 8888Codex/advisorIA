@@ -7,58 +7,38 @@ const corsHeaders = {
 
 serve(async (req) => {
   // Log para confirmar a versão da função
-  console.log("--- DEPLOYMENT CHECK: VERSION 5 ---");
-  console.log("--- Model: llama-3-sonar-small-32k-online ---");
+  console.log("--- DEPLOYMENT CHECK: VERSION 6 (Bypass Test) ---");
+  console.log("--- Esta versão ignora completamente a API da Perplexity. ---");
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
   
   try {
-    const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
-    if (!apiKey) {
-      console.log("[V5] Error: PERPLEXITY_API_KEY not found in environment secrets.");
-      return new Response(JSON.stringify({ 
-        success: false, error: "PERPLEXITY_API_KEY not found"
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-    }
-
-    const testQuery = "What is the latest iPhone model from Apple?";
-    const modelToUse = "llama-3-sonar-small-32k-online";
-
-    const requestBody = {
-      model: modelToUse,
-      messages: [{ role: "user", content: testQuery }],
-    };
-
-    console.log(`[V5] Attempting to call Perplexity with model: ${modelToUse}`);
-
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[V5] Perplexity API returned an error. Status: ${response.status}. Body: ${errorText}`);
-      return new Response(JSON.stringify({ 
-        success: false, error: `Perplexity API Error: ${errorText}`
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-    }
-
-    const data = await response.json();
-    const result = data.choices?.[0]?.message?.content;
+    // Esta função agora ignora a chamada à API da Perplexity para testar se os deploys estão funcionando.
+    // Ela sempre retornará uma mensagem de sucesso.
     
-    console.log("[V5] Success! Perplexity API call was successful.");
-    return new Response(JSON.stringify({ success: true, result: result }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
+    const successMessage = "Teste de bypass bem-sucedido! O deploy da função está funcionando. Agora podemos reativar a API.";
+
+    console.log("[V6] Teste de bypass bem-sucedido. Retornando mensagem fixa.");
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      result: successMessage 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+      status: 200
     });
 
   } catch (error) {
-    console.error(`[V5] A critical error occurred: ${error.message}`);
+    // Este bloco de erro não deve ser alcançado nesta versão.
+    console.error(`[V6] Ocorreu um erro crítico, o que é inesperado no modo de bypass: ${error.message}`);
     return new Response(JSON.stringify({ 
-      success: false, error: `Critical Error: ${error.message}`
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      success: false, 
+      error: `Erro Crítico no Modo Bypass: ${error.message}`
+    }), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+      status: 500 
+    });
   }
 })
