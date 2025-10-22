@@ -1,8 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { BrainCircuit, MessageSquare, Bot, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -13,33 +11,32 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <div className="flex h-full flex-col gap-2 bg-muted/40 p-2">
-      <div className="flex h-16 items-center justify-center border-b">
-        <h1 className="text-lg font-semibold">Consultoria IA</h1>
+    <div className="flex h-full max-h-screen flex-col gap-2">
+      <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+        <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
+          <Bot className="h-6 w-6" />
+          <span className="">Consultoria IA</span>
+        </NavLink>
       </div>
-      <nav className="flex flex-col gap-1">
-        {navItems.map((item) => (
-          <Tooltip key={item.to}>
-            <TooltipTrigger asChild>
-              <NavLink
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    buttonVariants({ variant: isActive ? "default" : "ghost", size: "default" }),
-                    "w-full justify-start"
-                  )
-                }
-              >
-                <item.icon className="mr-2 h-4 w-4" />
-                {item.label}
-              </NavLink>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{item.label}</p>
-            </TooltipContent>
-          </Tooltip>
-        ))}
-      </nav>
+      <div className="flex-1 overflow-auto py-2">
+        <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+                  isActive && "bg-muted text-primary"
+                )
+              }
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
     </div>
   );
 }
