@@ -12,6 +12,7 @@ import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles, Pencil } from 'lucid
 import { showSuccess, showError, showLoading } from '@/utils/toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 const cloneSchema = z.object({
   name: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
@@ -33,6 +34,7 @@ export interface CustomAgent {
 
 const CustomClones = () => {
   const { session, supabase } = useSession();
+  const navigate = useNavigate();
   const [clones, setClones] = useState<CustomAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -128,16 +130,24 @@ const CustomClones = () => {
   const onSubmit = async (values: z.infer<typeof cloneSchema>) => {
     setIsSubmitting(true);
     try {
+      let response;
       if (editingClone) {
-        const { error } = await supabase.from('custom_agents').update(values).eq('id', editingClone.id);
-        if (error) throw error;
-        showSuccess('Clone atualizado com sucesso!');
-        setEditingClone(null);
+        response = await supabase.from('custom_agents').update(values).eq('id', editingClone.id).select().single();
       } else {
-        const { error } = await supabase.from('custom_agents').insert(values);
-        if (error) throw error;
-        showSuccess('Clone criado com sucesso!');
+        response = await supabase.from('custom_agents').insert(values).select().single();
       }
+
+      if (response.error) throw response.error;
+      const savedClone = response.data;
+
+      toast.success(`Clone "${savedClone.name}" salvo com sucesso!`, {
+        action: {
+          label: "Testar Clone",
+          onClick: () => navigate(`/chat?agentId=${savedClone.id}`),
+        },
+      });
+
+      setEditingClone(null);
       form.reset();
       fetchClones();
     } catch (error) {

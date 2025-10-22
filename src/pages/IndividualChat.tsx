@@ -8,7 +8,7 @@ import { CustomAgent } from './CustomClones';
 import { showError } from '@/utils/toast';
 import { ConversationList } from '@/components/ConversationList';
 import { ChatInterface } from '@/components/ChatInterface';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 
 type View = 'agent_selection' | 'conversation_list' | 'chat_view' | 'loading';
 
@@ -31,6 +31,7 @@ interface Conversation {
 const IndividualChat = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<View>(conversationId ? 'loading' : 'agent_selection');
   const [selectedAgent, setSelectedAgent] = useState<SelectedAgent | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -95,6 +96,32 @@ const IndividualChat = () => {
       fetchCustomAgents();
     }
   }, [session, view, supabase]);
+
+  useEffect(() => {
+    const agentIdToSelect = searchParams.get('agentId');
+    if (!agentIdToSelect || loadingCustom || view !== 'agent_selection') return;
+
+    const allAgents = [
+      ...availableAgents,
+      ...customAgents.map(clone => ({
+        id: clone.id, name: clone.name, avatar: '/placeholder.svg', title: clone.title || 'Clone Customizado', description: clone.description || 'Um especialista de IA criado por você.', tags: ['Customizado'], fidelity: 'Alta' as const, customizable: true, type: 'custom' as const, emoji: clone.emoji
+      }))
+    ];
+
+    const agent = allAgents.find(a => a.id === agentIdToSelect);
+
+    if (agent) {
+      handleAgentSelect(agent);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('agentId');
+      setSearchParams(newSearchParams, { replace: true });
+    } else if (!loadingCustom) {
+      showError(`Clone com ID "${agentIdToSelect}" não encontrado.`);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('agentId');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [searchParams, customAgents, loadingCustom, setSearchParams, view]);
 
   const handleAgentSelect = (agent: SelectedAgent) => {
     setSelectedAgent(agent);
