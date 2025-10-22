@@ -9,8 +9,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles, Pencil } from 'lucide-react';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess, showError, showLoading } from '@/utils/toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { toast } from 'sonner';
 
 const cloneSchema = z.object({
   name: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
@@ -69,24 +70,37 @@ const CustomClones = () => {
       return;
     }
     setIsGeneratingPersona(true);
+    const toastId = showLoading('Iniciando geração de persona...');
     try {
-      const { data, error } = await supabase.functions.invoke('generate-persona', {
+      // Step 1: Generate the base persona
+      toast.loading('Passo 1/2: Pesquisando e gerando a persona base...', { id: toastId });
+      const { data: personaData, error: personaError } = await supabase.functions.invoke('generate-persona', {
         body: { name },
       });
 
-      if (error) {
-        // Try to extract the detailed error message from the function's response
-        const detailedError = error.context?.error?.message || error.message;
+      if (personaError) {
+        const detailedError = personaError.context?.error?.message || personaError.message;
         throw new Error(detailedError);
       }
-      
-      if (data.error) throw new Error(data.error);
+      if (personaData.error) throw new Error(personaData.error);
 
-      form.setValue('persona', data.persona, { shouldValidate: true });
-      showSuccess('Persona gerada com sucesso!');
+      // Step 2: Refine the persona
+      toast.loading('Passo 2/2: Refinando a estrutura da persona...', { id: toastId });
+      const { data: refinedData, error: refinedError } = await supabase.functions.invoke('refine-persona', {
+        body: { personaText: personaData.persona, agentName: name },
+      });
+
+      if (refinedError) {
+        const detailedError = refinedError.context?.error?.message || refinedError.message;
+        throw new Error(detailedError);
+      }
+      if (refinedData.error) throw new Error(refinedData.error);
+
+      form.setValue('persona', refinedData.refinedPersona, { shouldValidate: true });
+      toast.success('Persona gerada e refinada com sucesso!', { id: toastId });
     } catch (error: any) {
       const detail = error.message || 'Ocorreu um erro desconhecido.';
-      showError(`Falha ao gerar a persona: ${detail}`);
+      toast.error(`Falha ao gerar a persona: ${detail}`, { id: toastId });
       console.error("Detailed persona generation error:", error);
     } finally {
       setIsGeneratingPersona(false);
@@ -184,7 +198,7 @@ const CustomClones = () => {
                   {editingClone && <Button type="button" variant="outline" className="w-full" onClick={cancelEdit}>Cancelar</Button>}
                   <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isSubmitting ? (editingClone ? 'Atualizando...' : 'Criando...') : (editingClone ? 'Atualizar Clone' : 'Criar Clone')}
+                    {isSubmitting ? (editingClone ? 'Atualizando...' : 'Criando...') : (editingClone ? 'Criar Clone' : 'Criar Clone')}
                   </Button>
                 </div>
               </form>
