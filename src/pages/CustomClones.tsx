@@ -72,12 +72,18 @@ const CustomClones = () => {
       const { data, error } = await supabase.functions.invoke('generate-persona', {
         body: { name },
       });
+
       if (error) throw error;
+      
+      // The Edge Function itself might return an error in its body if the API call fails
+      if (data.error) throw new Error(data.error);
+
       form.setValue('persona', data.persona, { shouldValidate: true });
       showSuccess('Persona gerada com sucesso!');
-    } catch (error) {
-      showError('Falha ao gerar a persona.');
-      console.error(error);
+    } catch (error: any) {
+      const detail = error.message || 'Ocorreu um erro desconhecido.';
+      showError(`Falha ao gerar a persona: ${detail}`);
+      console.error("Detailed persona generation error:", error);
     } finally {
       setIsGeneratingPersona(false);
     }
