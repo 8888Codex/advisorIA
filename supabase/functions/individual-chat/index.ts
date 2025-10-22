@@ -60,26 +60,12 @@ Características principais:
 async function searchWithPerplexity(query: string): Promise<string | null> {
   const apiKey = Deno.env.get("PERPLEXITY_API_KEY");
   if (!apiKey) {
-    console.error("❌ PERPLEXITY_API_KEY não encontrada nos segredos!");
+    console.error("❌ PERPLEXITY_API_KEY não encontrada!");
     return null;
   }
 
   try {
-    const requestBody = {
-      model: "llama-3-sonar-small-32k-online", // NOVO MODELO VÁLIDO
-      messages: [
-        {
-          role: "system",
-          content: "Você é um assistente de pesquisa especializado. Forneça informações precisas, atualizadas e detalhadas sobre o tópico solicitado."
-        },
-        {
-          role: "user", 
-          content: query
-        }
-      ],
-      max_tokens: 1500,
-      temperature: 0.1,
-    };
+    console.log(`🔍 Buscando na internet: "${query}"`);
     
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -87,7 +73,21 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        model: "llama-3-sonar-large-32k-online", // MESMO MODELO QUE FUNCIONA NO TESTE
+        messages: [
+          {
+            role: "system",
+            content: "Você é um assistente de pesquisa especializado. Forneça informações precisas, atualizadas e detalhadas sobre o tópico solicitado."
+          },
+          {
+            role: "user", 
+            content: query
+          }
+        ],
+        max_tokens: 1500,
+        temperature: 0.1,
+      }),
     });
 
     if (!response.ok) {
@@ -97,10 +97,16 @@ async function searchWithPerplexity(query: string): Promise<string | null> {
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || null;
+    const result = data.choices?.[0]?.message?.content;
+    
+    if (result) {
+      console.log(`✅ Busca bem-sucedida! Resultado: ${result.substring(0, 100)}...`);
+    }
+    
+    return result || null;
     
   } catch (error) {
-    console.error("💥 ERRO CRÍTICO na busca Perplexity:", error);
+    console.error("💥 ERRO na busca Perplexity:", error);
     return null;
   }
 }
@@ -156,11 +162,26 @@ serve(async (req) => {
     }
 
     const userQuery = messages[messages.length - 1]?.content || "";
+    
+    // SEMPRE fazer busca na internet para perguntas dos usuários
+    console.log(`🤖 ${agentName} processando: "${userQuery}"`);
     const searchContext = await searchWithPerplexity(userQuery);
     
     let finalSystemPrompt = systemPrompt;
     if (searchContext) {
-      finalSystemPrompt = `${systemPrompt}\n\n=== INFORMAÇÕES ATUALIZADAS DA INTERNET ===\n${searchContext}\n\nINSTRUÇÕES CRÍTICAS: Use essas informações para enriquecer sua resposta. NÃO mencione que fez uma busca.`;
+      console.log(`🌐 ${agentName} obteve dados da internet!`);
+      finalSystemPrompt = `${systemPrompt}
+
+=== INFORMAÇÕES ATUALIZADAS DA INTERNET ===
+${searchContext}
+
+INSTRUÇÕES CRÍTICAS: 
+- Use essas informações para enriquecer sua resposta
+- Integre os dados naturalmente em seu raciocínio
+- Mantenha sua personalidade
+- NÃO mencione que fez uma busca`;
+    } else {
+      console.log(`⚠️ ${agentName} não conseguiu dados da internet, usando conhecimento base.`);
     }
 
     const assistantResponse = await callAnthropic(messages, finalSystemPrompt);
