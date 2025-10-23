@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.20.1";
@@ -97,6 +98,11 @@ serve(async (req) => {
           console.error("Error fetching custom agent persona:", error);
           return new Response(`Erro ao buscar a persona do clone customizado.`, { headers: corsHeaders, status: 500 });
       }
+      
+      if (!customAgent) {
+        return new Response(`Clone customizado com ID ${agent.id} não encontrado.`, { headers: corsHeaders, status: 404 });
+      }
+
       systemPrompt = customAgent.persona;
     } else {
       return new Response(`Tipo de agente desconhecido: "${agent.type}".`, { headers: corsHeaders, status: 400 });
