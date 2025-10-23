@@ -98,7 +98,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !session?.user) return;
 
     const userMessage: Message = { role: 'user', content: input };
     const newMessages = [...messages, userMessage];
@@ -114,6 +114,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
         const { data: newConvData, error: newConvError } = await supabase
           .from('conversations')
           .insert({
+            user_id: session.user.id,
             agent_id: agent.id,
             agent_name: agent.name,
             agent_avatar: agent.avatar,
@@ -130,6 +131,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
       // Save user message
       await supabase.from('messages').insert({
         conversation_id: currentConversation.id,
+        user_id: session.user.id,
         role: 'user',
         content: input,
       });
@@ -193,6 +195,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
       // Save final assistant message
       await supabase.from('messages').insert({
         conversation_id: currentConversation.id,
+        user_id: session.user.id,
         role: 'assistant',
         content: finalContent,
       });
