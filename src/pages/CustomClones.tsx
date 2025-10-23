@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles, Pencil, Upload } from 'lucide-react';
+import { PlusCircle, Bot, Trash2, Loader2, Inbox, Sparkles, Pencil, Upload, MoreVertical } from 'lucide-react';
 import { showSuccess, showError, showLoading } from '@/utils/toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -207,12 +208,44 @@ const CustomClones = () => {
           </DialogContent>
         </Dialog>
       </div>
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" /> Sua Lista de Clones</CardTitle><CardDescription>Gerencie os especialistas que você criou.</CardDescription></CardHeader>
-        <CardContent>
-          {isLoading ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : clones.length > 0 ? (<div className="space-y-4">{clones.map(clone => (<div key={clone.id} className="flex items-center justify-between p-4 border rounded-lg"><div className="flex items-center gap-4"><Avatar className="h-12 w-12"><AvatarImage src={clone.avatar_url || ''} /><AvatarFallback className="text-2xl">{clone.emoji || '🤖'}</AvatarFallback></Avatar><div><p className="font-semibold">{clone.name}</p><p className="text-sm text-muted-foreground">{clone.title || 'Sem título'}</p></div></div><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => handleOpenDialog(clone)}><Pencil className="h-4 w-4" /></Button><AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir "{clone.name}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O clone será removido permanentemente.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteClone(clone.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div></div>))}</div>) : (<div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg"><Inbox className="h-12 w-12 mb-4 text-gray-400" /><h3 className="text-lg font-semibold text-foreground">Nenhum clone encontrado</h3><p>Clique em "Criar Novo Clone" para começar.</p></div>)}
-        </CardContent>
-      </Card>
+
+      {isLoading ? (
+        <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+      ) : clones.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {clones.map(clone => (
+            <Card key={clone.id} className="flex flex-col">
+              <CardHeader className="flex-row gap-4 items-start">
+                <Avatar className="w-12 h-12 border"><AvatarImage src={clone.avatar_url || ''} /><AvatarFallback className="text-2xl">{clone.emoji || '🤖'}</AvatarFallback></Avatar>
+                <div className="flex-1">
+                  <CardTitle>{clone.name}</CardTitle>
+                  <CardDescription>{clone.title || 'Sem título'}</CardDescription>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="-mt-2 -mr-2"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleOpenDialog(clone)}><Pencil className="mr-2 h-4 w-4" />Editar</DropdownMenuItem>
+                    <AlertDialog><AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Excluir</DropdownMenuItem></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir "{clone.name}"?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O clone será removido permanentemente.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteClone(clone.id)}>Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <p className="text-sm text-muted-foreground line-clamp-3">{clone.description || 'Nenhuma descrição fornecida.'}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-10">
+            <div className="text-center text-muted-foreground">
+              <Inbox className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-lg font-semibold text-foreground">Nenhum clone encontrado</h3>
+              <p className="mt-1">Clique em "Criar Novo Clone" para começar.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
