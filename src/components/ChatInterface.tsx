@@ -137,13 +137,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
       // Add empty assistant message for streaming
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
+      const agentForApi = {
+        id: agent.id,
+        name: agent.name,
+        type: agent.type,
+      };
+
       const response = await fetch(`https://xkhsbxlwbgipzutufjei.supabase.co/functions/v1/individual-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ messages: newMessages, agent }),
+        body: JSON.stringify({ messages: newMessages, agent: agentForApi }),
       });
 
       if (!response.ok) {
@@ -193,8 +199,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ agent, initialConv
 
     } catch (error: any) {
       console.error("Erro no ciclo de chat:", error);
-      const errorMessage: Message = { role: 'assistant', content: `Desculpe, ocorreu um erro. Por favor, tente novamente.` };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1].content = `Desculpe, ocorreu um erro. Por favor, tente novamente.`;
+        return updated;
+      });
     } finally {
       setIsLoading(false);
     }
